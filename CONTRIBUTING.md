@@ -22,7 +22,7 @@ Specifically for code in this repo:
 
 1. Use pnpm as the default package manager for the project. You can [install pnpm by following the instructions](https://pnpm.io/installation). Commit `pnpm-lock.yaml` to the repository.
 
-2. Solana Programs written for Anchor framework  should be in directory (`anchor`)[https://www.anchor-lang.com], Solana Native in (`native`)[https://solana.com/developers/guides/getstarted/intro-to-native-rust], Steel Framework in (`steel`)[https://github.com/regolith-labs/steel], TypeScript in (`poseidon`)[https://github.com/Turbin3/poseidon], respectively.
+2. Solana Programs written for the Anchor framework should be in directory [`anchor`](https://www.anchor-lang.com), Solana Native in [`native`](https://solana.com/developers/guides/getstarted/intro-to-native-rust), Steel Framework in [`steel`](https://github.com/regolith-labs/steel), TypeScript in [`poseidon`](https://github.com/Turbin3/poseidon), respectively.
   - Project path structure: `/program-examples/category/example-name/<framework_name>`
     - Project path structure example for anchor: `/program-examples/category/example-name/anchor`
 
