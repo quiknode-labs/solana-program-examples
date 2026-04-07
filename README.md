@@ -132,13 +132,13 @@ How to store state that changes size in Solana.
 
 ### Minting NFTS
 
-[Mint an NFT from inside your own onchain program using the Token and Metaplex Token Metadata programs.](./tokens/nft-minter/README.md) Reminder: you don't need your own program just to mint an NFT, see the note at the top of this README.
+[Mint an NFT from inside your own onchain program using the Token and Metaplex Token Metadata programs.](./tokens/nft-minter/README.md)
 
 [anchor](./tokens/nft-minter/anchor) [native](./tokens/nft-minter/native)
 
 ### Minting a token from inside a program
 
-[Mint a Token from inside your own onchain program using the Token program.](./tokens/spl-token-minter/README.md) Reminder: you don't need your own program just to mint an NFT, see the note at the top of this README.
+[Mint a Token from inside your own onchain program using the Token program.](./tokens/spl-token-minter/README.md)
 
 [anchor](./tokens/spl-token-minter/anchor) [native](./tokens/spl-token-minter/native)
 
@@ -156,7 +156,7 @@ Allow two users to swap digital assets with each other, each getting 100% of wha
 
 ### Minting a token from inside a program with a PDA as the mint authority
 
-[Mint a Token from inside your own onchain program using the Token program.](./tokens/pda-mint-authority/README.md) Reminder: you don't need your own program just to mint an NFT, see the note at the top of this README.
+[Mint a Token from inside your own onchain program using the Token program.](./tokens/pda-mint-authority/README.md)
 
 [anchor](./tokens/pda-mint-authority/anchor) [native](./tokens/pda-mint-authority/native)
 
