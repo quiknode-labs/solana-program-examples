@@ -1,4 +1,4 @@
-use crate::*;
+use anchor_lang::prelude::*;
 
 pub const SEED_DATA: &[u8] = b"DATA";
 

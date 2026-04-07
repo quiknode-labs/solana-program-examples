@@ -2998,6 +2998,8 @@ dependencies = [
 [[package]]
 name = "solana-kite"
 version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92c6774af93647a15b51e266bc76f558fba11fbfbe30131b50664e665a8fea55"
 dependencies = [
  "litesvm",
  "solana-account",
