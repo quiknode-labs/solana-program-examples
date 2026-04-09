@@ -128,15 +128,7 @@ jobs:
             echo "Building and Testing $project"
             cd "$project" || return 1
 
-            # Install dependencies first
-            if ! pnpm install --frozen-lockfile; then
-              echo "::error::pnpm install failed for $project"
-              echo "$project: pnpm install failed" >> $GITHUB_WORKSPACE/failed_projects.txt
-              cd - > /dev/null
-              return 1
-            fi
-
-            # Run anchor build
+            # Build first — generates IDL and types that pnpm install/tests need
             if ! anchor build; then
               echo "::error::anchor build failed for $project"
               echo "$project: anchor build failed" >> $GITHUB_WORKSPACE/failed_projects.txt
@@ -145,8 +137,17 @@ jobs:
               return 1
             fi
 
-            # Run anchor test
-            if ! anchor test; then
+            # Install dependencies (after build so generated types are available)
+            if ! pnpm install --frozen-lockfile; then
+              echo "::error::pnpm install failed for $project"
+              echo "$project: pnpm install failed" >> $GITHUB_WORKSPACE/failed_projects.txt
+              rm -rf target
+              cd - > /dev/null
+              return 1
+            fi
+
+            # Run anchor test (--skip-build since we already built above)
+            if ! anchor test --skip-build; then
               echo "::error::anchor test failed for $project"
               echo "$project: anchor test failed" >> $GITHUB_WORKSPACE/failed_projects.txt
               rm -rf target node_modules
