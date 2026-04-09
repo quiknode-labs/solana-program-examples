@@ -6,7 +6,6 @@ on:
   push:
     branches:
       - main
-      - fix-biome-errors
   pull_request:
     types: [opened, synchronize, reopened]
     branches:
@@ -16,10 +15,6 @@ env:
   MAX_JOBS: 64
   MIN_PROJECTS_PER_JOB: 4
   MIN_PROJECTS_FOR_MATRIX: 4
-  # Force all JavaScript-based actions to use Node.js 24 runtime.
-  # Node.js 20 actions are deprecated and will stop working June 2026.
-  # This catches composite actions whose internal dependencies still reference @v4.
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   changes:
