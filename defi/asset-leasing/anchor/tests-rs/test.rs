@@ -88,7 +88,7 @@ fn test_full_lease_lifecycle() {
     let owner = create_wallet(&mut svm, 10_000_000_000).unwrap();
     let renter = create_wallet(&mut svm, 10_000_000_000).unwrap();
 
-    // --- Initialize protocol ---
+    // --- Initialize program ---
     let (config_pda, _) = lease_config_pda();
     let system_program = solana_pubkey::pubkey!("11111111111111111111111111111111");
 

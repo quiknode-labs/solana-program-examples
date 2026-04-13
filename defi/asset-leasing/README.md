@@ -1,6 +1,6 @@
-# Asset Leasing Protocol
+# Asset Leasing Program
 
-An on-chain protocol for renting and leasing digital assets (SPL tokens, NFTs) for a fixed duration on Solana.
+An on-chain program for renting and leasing digital assets (SPL tokens, NFTs) for a fixed duration on Solana.
 
 ## How It Works
 
@@ -22,14 +22,14 @@ An on-chain protocol for renting and leasing digital assets (SPL tokens, NFTs) f
 
 1. **Owner** has an SPL token (fungible or NFT with amount=1)
 2. **`list_asset`** — Owner deposits the token into a program-owned vault PDA and creates a `Listing` with pricing terms
-3. **`rent_asset`** — Renter pays SOL (owner gets payment minus protocol fee), token moves from vault to renter
+3. **`rent_asset`** — Renter pays SOL (owner gets payment minus program fee), token moves from vault to renter
 4. **`return_asset`** — Renter sends the token back to the vault, lease is marked returned
 5. **`delist_asset`** — Owner withdraws the token from vault (only if no active lease)
 6. **`claim_expired`** — Owner can close an expired lease if the renter hasn't returned the asset
 
-### Protocol Fees
+### Program Fees
 
-The protocol takes a configurable fee (default 2.5%) on each rental payment. Fees are paid directly to the authority in SOL during the `rent_asset` instruction. The authority can update the fee rate via `collect_fees`.
+The program takes a configurable fee (default 2.5%) on each rental payment. Fees are paid directly to the authority in SOL during the `rent_asset` instruction. The authority can update the fee rate via `collect_fees`.
 
 ## State Accounts
 
@@ -43,13 +43,13 @@ The protocol takes a configurable fee (default 2.5%) on each rental payment. Fee
 
 | Instruction | Who | What |
 |-------------|-----|------|
-| `initialize` | Authority | Create the protocol config |
+| `initialize` | Authority | Create the program config |
 | `list_asset` | Asset owner | Deposit token to vault, create listing |
 | `delist_asset` | Asset owner | Withdraw token from vault, close listing |
 | `rent_asset` | Renter | Pay SOL, receive token, create lease |
 | `return_asset` | Renter | Return token to vault, mark lease returned |
 | `claim_expired` | Asset owner | Close expired lease, free listing |
-| `collect_fees` | Authority | Update the protocol fee rate |
+| `collect_fees` | Authority | Update the program fee rate |
 
 ## Building
 

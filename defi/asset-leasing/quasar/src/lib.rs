@@ -1,6 +1,6 @@
 #![cfg_attr(not(test), no_std)]
 
-//! Asset Leasing Protocol — Quasar implementation
+//! Asset Leasing Program — Quasar implementation
 //!
 //! Note: Quasar is pre-release (0.0.0) and its API differs significantly
 //! from Anchor. This implementation demonstrates the Quasar patterns.

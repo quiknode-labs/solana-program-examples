@@ -1,4 +1,4 @@
-// Quasar tests for the asset leasing protocol.
+// Quasar tests for the asset leasing program.
 //
 // Note: Full test coverage for all instructions is in the Anchor version
 // (tests-rs/test.rs). The Quasar version currently implements initialize

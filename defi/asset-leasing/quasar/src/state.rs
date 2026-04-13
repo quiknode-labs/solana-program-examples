@@ -1,6 +1,6 @@
 use quasar_lang::prelude::*;
 
-/// Global protocol configuration — one per deployment.
+/// Global program configuration — one per deployment.
 #[account(discriminator = [1])]
 pub struct LeaseConfig {
     pub authority: Address,

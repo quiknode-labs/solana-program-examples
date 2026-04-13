@@ -1,6 +1,6 @@
 use quasar_lang::prelude::ProgramError;
 
-/// Custom error codes for the asset leasing protocol.
+/// Custom error codes for the asset leasing program.
 /// Offset from 6000 to avoid collision with built-in errors.
 #[repr(u32)]
 pub enum AssetLeasingError {

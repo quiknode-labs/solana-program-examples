@@ -92,7 +92,7 @@ pub fn handle_rent_asset(
         .checked_mul(duration as u64)
         .ok_or(AssetLeasingError::ArithmeticOverflow)?;
 
-    // Calculate protocol fee
+    // Calculate program fee
     let fee_amount = total_cost
         .checked_mul(context.accounts.lease_config.fee_basis_points as u64)
         .ok_or(AssetLeasingError::ArithmeticOverflow)?
@@ -116,7 +116,7 @@ pub fn handle_rent_asset(
         owner_amount,
     )?;
 
-    // Pay the protocol fee
+    // Pay the program fee
     if fee_amount > 0 {
         system_program::transfer(
             CpiContext::new(

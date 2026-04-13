@@ -1,4 +1,4 @@
-/// Protocol fee: 2.5% expressed in basis points (1 bp = 0.01%)
+/// Program fee: 2.5% expressed in basis points (1 bp = 0.01%)
 pub const DEFAULT_FEE_BASIS_POINTS: u16 = 250;
 
 pub const MAX_FEE_BASIS_POINTS: u16 = 10_000;

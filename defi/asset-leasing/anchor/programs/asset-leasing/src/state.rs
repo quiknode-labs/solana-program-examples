@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-/// Global protocol configuration — one per deployment.
+/// Global program configuration — one per deployment.
 /// Stores the authority who can collect fees and the fee rate.
 #[account]
 #[derive(InitSpace)]
