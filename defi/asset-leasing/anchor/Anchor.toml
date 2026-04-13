@@ -1,0 +1,15 @@
+[toolchain]
+solana_version = "3.1.8"
+
+[features]
+resolution = true
+skip-lint = false
+
+[programs.localnet]
+asset_leasing = "9GSiyP3PBh3oH9toXJnang1gqh925qJxDm4zYcmSkUgt"
+
+[provider]
+cluster = "localnet"
+wallet = "~/.config/solana/id.json"
+
+[hooks]

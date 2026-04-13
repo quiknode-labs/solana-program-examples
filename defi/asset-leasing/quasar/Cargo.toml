@@ -1,0 +1,22 @@
+# Standalone workspace — quasar uses its own toolchain/build pipeline
+[workspace]
+
+[package]
+name = "asset-leasing-quasar"
+version = "0.1.0"
+description = "Token leasing protocol — Quasar implementation"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+name = "asset_leasing_quasar"
+
+[dependencies]
+quasar-lang = "0.0.0"
+quasar-spl = "0.0.0"
+
+[dev-dependencies]
+quasar-svm = "0.1.0"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(target_os, values("solana"))'] }
