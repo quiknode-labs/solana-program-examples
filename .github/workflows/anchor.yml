@@ -109,8 +109,10 @@ jobs:
       - uses: pnpm/action-setup@v4
       - uses: heyAyushh/setup-anchor@v4.999
         with:
-          anchor-version: 0.32.1
+          anchor-version: 1.0.0
           solana-cli-version: stable
+      - name: Install Surfpool
+        run: curl -sL https://run.surfpool.run/ | bash
       - name: Display Versions
         run: |
           solana -V
@@ -118,6 +120,7 @@ jobs:
           solana-keygen new --no-bip39-passphrase --force
           rustc -V
           anchor -V
+          surfpool --version
       - name: Build and Test
         env:
           TOTAL_PROJECTS: ${{ needs.changes.outputs.total_projects }}
@@ -134,6 +137,27 @@ jobs:
               echo "$project: pnpm install failed" >> $GITHUB_WORKSPACE/failed_projects.txt
               cd - > /dev/null
               return 1
+            fi
+
+            # Sync program IDs (Anchor 1.0.0 requires keypair and declare_id! to match)
+            anchor keys sync
+
+            # Update IDL address fields to match the synced keys.
+            # declare_program!(name) reads the address from idls/<name>.json, so
+            # after keys sync changes the program IDs, the IDLs must match too —
+            # otherwise LiteSVM tests load the .so at the old IDL address while
+            # the compiled program expects the new declare_id!() address.
+            if [ -d "idls" ]; then
+              for idl_file in idls/*.json; do
+                program_name=$(basename "$idl_file" .json)
+                # Look up the new address from Anchor.toml [programs.localnet]
+                new_address=$(grep "^${program_name} " Anchor.toml | head -1 | sed 's/.*= *"\(.*\)"/\1/')
+                if [ -n "$new_address" ]; then
+                  # Update the "address" field in the IDL JSON
+                  tmp=$(mktemp)
+                  jq --arg addr "$new_address" '.address = $addr' "$idl_file" > "$tmp" && mv "$tmp" "$idl_file"
+                fi
+              done
             fi
 
             # Run anchor build
