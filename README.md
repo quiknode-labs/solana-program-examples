@@ -34,6 +34,12 @@ Create a fundraiser specifying a target mint and amount. Contributors deposit to
 
 [⚓ Anchor](./tokens/token-fundraiser/anchor) [💫 Quasar](./tokens/token-fundraiser/quasar)
 
+### Pyth Price Feeds
+
+Read offchain price data onchain using the Pyth oracle network.
+
+[⚓ Anchor](./oracles/pyth/anchor) [💫 Quasar](./oracles/pyth/quasar)
+
 ## Basics
 
 ### Hello Solana
@@ -317,14 +323,6 @@ Store Metaplex compressed NFTs inside a PDA.
 Work with Metaplex compressed NFTs.
 
 [⚓ Anchor](./compression/cutils/anchor) [💫 Quasar](./compression/cutils/quasar)
-
-## Oracles
-
-### Pyth Price Feeds
-
-Read offchain price data onchain using the Pyth oracle network.
-
-[⚓ Anchor](./oracles/pyth/anchor) [💫 Quasar](./oracles/pyth/quasar)
 
 ---
 
