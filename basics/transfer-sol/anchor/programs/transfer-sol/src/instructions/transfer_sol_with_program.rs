@@ -5,7 +5,7 @@ pub struct TransferSolWithProgram<'info> {
     /// CHECK: Use owner constraint to check account is owned by our program
     #[account(
         mut,
-        owner = id() // value of declare_id!()
+        owner = crate::ID // value of declare_id!()
     )]
     payer: UncheckedAccount<'info>,
     #[account(mut)]
