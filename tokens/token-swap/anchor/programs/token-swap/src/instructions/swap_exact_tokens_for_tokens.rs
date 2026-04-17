@@ -134,7 +134,7 @@ pub fn handle_swap_exact_tokens_for_tokens(
     // We tolerate if the new invariant is higher because it means a rounding error for LPs
     context.accounts.pool_account_a.reload()?;
     context.accounts.pool_account_b.reload()?;
-    if invariant > context.accounts.pool_account_a.amount * context.accounts.pool_account_a.amount {
+    if invariant > context.accounts.pool_account_a.amount * context.accounts.pool_account_b.amount {
         return err!(TutorialError::InvariantViolated);
     }
 
