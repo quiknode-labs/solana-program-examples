@@ -57,7 +57,7 @@ pub struct Initialize<'info> {
         payer = maker,
         seeds = [b"fundraiser", maker.key().as_ref()],
         bump,
-        space = ANCHOR_DISCRIMINATOR + Fundraiser::INIT_SPACE,
+        space = Fundraiser::DISCRIMINATOR.len() + Fundraiser::INIT_SPACE,
     )]
     pub fundraiser: Account<'info, Fundraiser>,
     #[account(
@@ -151,7 +151,7 @@ pub struct Contribute<'info> {
         payer = contributor,
         seeds = [b"contributor", fundraiser.key().as_ref(), contributor.key().as_ref()],
         bump,
-        space = ANCHOR_DISCRIMINATOR + Contributor::INIT_SPACE,
+        space = Contributor::DISCRIMINATOR.len() + Contributor::INIT_SPACE,
     )]
     pub contributor_account: Account<'info, Contributor>,
     #[account(

@@ -9,7 +9,7 @@ pub struct InitConfig<'info> {
     #[account(
         init,
         payer = payer,
-        space = 8 + Config::INIT_SPACE,
+        space = Config::DISCRIMINATOR.len() + Config::INIT_SPACE,
         seeds = [CONFIG_SEED],
         bump,
     )]

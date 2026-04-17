@@ -9,7 +9,7 @@ pub struct InitializeCounter<'info> {
 
     #[account(
         init,
-        space = 8 + Counter::INIT_SPACE,
+        space = Counter::DISCRIMINATOR.len() + Counter::INIT_SPACE,
         payer = payer
     )]
     pub counter: Account<'info, Counter>,

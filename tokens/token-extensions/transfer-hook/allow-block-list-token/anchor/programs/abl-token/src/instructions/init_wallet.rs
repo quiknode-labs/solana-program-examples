@@ -19,7 +19,7 @@ pub struct InitWallet<'info> {
     #[account(
         init,
         payer = authority,
-        space = 8 + ABWallet::INIT_SPACE,
+        space = ABWallet::DISCRIMINATOR.len() + ABWallet::INIT_SPACE,
         seeds = [AB_WALLET_SEED, wallet.key().as_ref()],
         bump,
     )]

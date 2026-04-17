@@ -1,3 +1,4 @@
+pub use crate::constants::TOKEN_METADATA_EXTENSION_SPACE;
 pub use crate::errors::GameErrorCode;
 pub use crate::errors::ProgramErrorCode;
 pub use crate::state::game_data::GameData;
@@ -22,10 +23,10 @@ pub fn handle_mint_nft(context: Context<MintNft>) -> Result<()> {
         }
     };
 
-    // This is the space required for the metadata account.
-    // We put the meta data into the mint account at the end so we
-    // don't need to create and additional account.
-    let meta_data_space = 250;
+    // Space required for the inline SPL Token Metadata extension TLV. The
+    // metadata lives on the mint account itself (not a separate account)
+    // so we just over-allocate enough room at creation time.
+    let meta_data_space = TOKEN_METADATA_EXTENSION_SPACE;
 
     let lamports_required = Rent::get()?.minimum_balance(space + meta_data_space);
 
@@ -190,9 +191,16 @@ pub struct MintNft<'info> {
     pub mint: Signer<'info>,
     pub rent: Sysvar<'info, Rent>,
     pub associated_token_program: Program<'info, AssociatedToken>,
-    #[account(init_if_needed, seeds = [b"nft_authority".as_ref()], bump, space = 8, payer = signer)]
+    #[account(
+        init_if_needed,
+        seeds = [b"nft_authority".as_ref()],
+        bump,
+        space = NftAuthority::DISCRIMINATOR.len() + NftAuthority::INIT_SPACE,
+        payer = signer
+    )]
     pub nft_authority: Account<'info, NftAuthority>,
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct NftAuthority {}

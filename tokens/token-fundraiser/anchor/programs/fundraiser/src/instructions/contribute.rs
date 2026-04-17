@@ -12,7 +12,6 @@ use crate::{
         Contributor, 
         Fundraiser
     }, FundraiserError, 
-    ANCHOR_DISCRIMINATOR, 
     MAX_CONTRIBUTION_PERCENTAGE, 
     PERCENTAGE_SCALER, SECONDS_TO_DAYS
 };
@@ -34,7 +33,7 @@ pub struct Contribute<'info> {
         payer = contributor,
         seeds = [b"contributor", fundraiser.key().as_ref(), contributor.key().as_ref()],
         bump,
-        space = ANCHOR_DISCRIMINATOR + Contributor::INIT_SPACE,
+        space = Contributor::DISCRIMINATOR.len() + Contributor::INIT_SPACE,
     )]
     pub contributor_account: Account<'info, Contributor>,
     #[account(

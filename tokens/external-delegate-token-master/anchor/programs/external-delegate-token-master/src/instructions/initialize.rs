@@ -4,7 +4,11 @@ use crate::UserAccount;
 
 #[derive(Accounts)]
 pub struct Initialize<'info> {
-    #[account(init, payer = authority, space = 8 + 32 + 20)]
+    #[account(
+        init,
+        payer = authority,
+        space = UserAccount::DISCRIMINATOR.len() + UserAccount::INIT_SPACE,
+    )]
     // Ensure this is only for user_account
     pub user_account: Account<'info, UserAccount>,
     #[account(mut)]

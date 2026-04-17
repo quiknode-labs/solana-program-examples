@@ -13,8 +13,8 @@ pub struct ConfigureAdmin<'info> {
     #[account(
         init_if_needed,
         payer=admin,
-        space=8+AdminConfig::INIT_SPACE,
-        seeds=[b"admin-config"],
+        space = AdminConfig::DISCRIMINATOR.len() + AdminConfig::INIT_SPACE,
+        seeds = [b"admin-config"],
         bump
     )]
     pub admin_config: Account<'info, AdminConfig>,

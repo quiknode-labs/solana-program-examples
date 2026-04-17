@@ -18,6 +18,12 @@ pub mod anchor_realloc {
     }
 }
 
+// NOTE: We intentionally do NOT derive `InitSpace` on `Message`. The realloc
+// example demonstrates growing/shrinking the account to exactly fit the
+// caller-provided `input`, whose length isn't known at compile time.
+// `InitSpace` + `#[max_len(N)]` would force a fixed upper bound, defeating
+// the point of the example. Instead, `required_space` computes the exact
+// layout (discriminator + length prefix + bytes) for init/realloc.
 #[account]
 pub struct Message {
     pub message: String,

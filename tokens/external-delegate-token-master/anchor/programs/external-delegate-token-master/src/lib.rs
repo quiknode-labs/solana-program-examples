@@ -37,6 +37,7 @@ pub mod external_delegate_token_master {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct UserAccount {
     pub authority: Pubkey,
     pub ethereum_address: [u8; 20],

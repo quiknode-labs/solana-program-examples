@@ -75,7 +75,7 @@ pub struct ChopTree<'info> {
     #[account(
         init_if_needed,
         payer = signer,
-        space = 1000,
+        space = GameData::DISCRIMINATOR.len() + GameData::INIT_SPACE,
         seeds = [level_seed.as_ref()],
         bump,
     )]
@@ -87,11 +87,11 @@ pub struct ChopTree<'info> {
     /// CHECK: Make sure the ata to the mint is actually owned by the signer
     #[account(mut)]
     pub mint: AccountInfo<'info>,
-    #[account(  
+    #[account(
         init_if_needed,
         seeds = [b"nft_authority".as_ref()],
         bump,
-        space = 8,
+        space = NftAuthority::DISCRIMINATOR.len() + NftAuthority::INIT_SPACE,
         payer = signer,
     )]
     pub nft_authority: Account<'info, NftAuthority>,

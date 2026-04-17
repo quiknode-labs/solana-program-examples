@@ -2,8 +2,13 @@ use crate::constants::*;
 use anchor_lang::prelude::*;
 
 #[account]
+#[derive(InitSpace)]
 pub struct PlayerData {
     pub authority: Pubkey,
+    /// Player name. Capped at 32 bytes — a conservative upper bound for
+    /// display names; bump `#[max_len]` if you need room for emoji-heavy
+    /// or international names (each non-ASCII codepoint costs up to 4 bytes).
+    #[max_len(32)]
     pub name: String,
     pub level: u8,
     pub xp: u64,

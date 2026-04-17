@@ -25,8 +25,8 @@ pub struct Switch<'info> {
     #[account(
         init_if_needed,
         payer=admin,
-        space=8+TransferSwitch::INIT_SPACE,
-        seeds=[wallet.key().as_ref()],
+        space = TransferSwitch::DISCRIMINATOR.len() + TransferSwitch::INIT_SPACE,
+        seeds = [wallet.key().as_ref()],
         bump,
     )]
     pub wallet_switch: Account<'info, TransferSwitch>,

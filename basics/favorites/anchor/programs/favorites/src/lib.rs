@@ -3,9 +3,6 @@ use anchor_lang::prelude::*;
 // This matches the key in the target/deploy directory
 declare_id!("ww9C83noARSQVBnqmCUmaVdbJjmiwcV9j2LkXYMoUCV");
 
-// Anchor programs always use 8 bits for the discriminator
-pub const ANCHOR_DISCRIMINATOR_SIZE: usize = 8;
-
 // Our Solana program!
 #[program]
 pub mod favorites {
@@ -56,7 +53,7 @@ pub struct SetFavorites<'info> {
     #[account(
         init_if_needed,
         payer = user,
-        space = ANCHOR_DISCRIMINATOR_SIZE + Favorites::INIT_SPACE,
+        space = Favorites::DISCRIMINATOR.len() + Favorites::INIT_SPACE,
         seeds=[b"favorites", user.key().as_ref()],
         bump
     )]

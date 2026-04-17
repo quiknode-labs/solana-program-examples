@@ -16,7 +16,7 @@ pub struct InitPlayer<'info> {
     #[account(
         init,
         payer = signer,
-        space = 1000, // 8+32+x+1+8+8+8 But taking 1000 to have space to expand easily.
+        space = PlayerData::DISCRIMINATOR.len() + PlayerData::INIT_SPACE,
         seeds = [b"player".as_ref(), signer.key().as_ref()],
         bump,
     )]
@@ -25,7 +25,7 @@ pub struct InitPlayer<'info> {
     #[account(
         init_if_needed,
         payer = signer,
-        space = 1000, // 8 + 8 for anchor account discriminator and the u64. Using 1000 to have space to expand easily.
+        space = GameData::DISCRIMINATOR.len() + GameData::INIT_SPACE,
         seeds = [level_seed.as_ref()],
         bump,
     )]

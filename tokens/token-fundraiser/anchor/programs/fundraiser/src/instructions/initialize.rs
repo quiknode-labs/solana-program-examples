@@ -9,7 +9,7 @@ use anchor_spl::{
 };
 
 use crate::{
-    state::Fundraiser, FundraiserError, ANCHOR_DISCRIMINATOR, MIN_AMOUNT_TO_RAISE
+    state::Fundraiser, FundraiserError, MIN_AMOUNT_TO_RAISE
 };
 
 #[derive(Accounts)]
@@ -22,7 +22,7 @@ pub struct Initialize<'info> {
         payer = maker,
         seeds = [b"fundraiser", maker.key().as_ref()],
         bump,
-        space = ANCHOR_DISCRIMINATOR + Fundraiser::INIT_SPACE,
+        space = Fundraiser::DISCRIMINATOR.len() + Fundraiser::INIT_SPACE,
     )]
     pub fundraiser: Account<'info, Fundraiser>,
     #[account(
