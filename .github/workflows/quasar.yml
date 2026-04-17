@@ -1,8 +1,6 @@
 name: Quasar
 
 on:
-  schedule:
-    - cron: "0 0 * * *"
   push:
     branches:
       - main
@@ -10,6 +8,10 @@ on:
     types: [opened, synchronize, reopened]
     branches:
       - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   MAX_JOBS: 64
@@ -31,6 +33,8 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
       - uses: dorny/paths-filter@v4
         id: changes
         if: github.event_name == 'pull_request'
@@ -53,8 +57,17 @@ jobs:
           }
 
           # Determine which projects to build and test
-          if [[ "${{ github.event_name }}" == "push" || "${{ github.event_name }}" == "schedule" || "${{ steps.changes.outputs.workflow }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "schedule" || "${{ steps.changes.outputs.workflow }}" == "true" ]]; then
+            # Workflow file changed or schedule — build everything
             projects=$(get_projects)
+          elif [[ "${{ github.event_name }}" == "push" ]]; then
+            # On push, only build projects with changes since parent commit
+            changed_files=$(git diff --name-only HEAD~1 HEAD 2>/dev/null || echo "")
+            if [ -z "$changed_files" ]; then
+              projects=$(get_projects)
+            else
+              projects=$(echo "$changed_files" | while read file; do dirname "$file" | grep quasar | sed 's#/quasar/.*#/quasar#g'; done | grep -vE "$ignore_pattern" | sort -u)
+            fi
           elif [[ "${{ steps.changes.outputs.quasar }}" == "true" ]]; then
             changed_files=(${{ steps.changes.outputs.quasar_files }})
             projects=$(for file in "${changed_files[@]}"; do dirname "${file}" | grep quasar | sed 's#/quasar/.*#/quasar#g'; done | grep -vE "$ignore_pattern" | sort -u)
@@ -107,6 +120,21 @@ jobs:
       failed_projects: ${{ steps.set-failed.outputs.failed_projects }}
     steps:
       - uses: actions/checkout@v5
+      - name: Setup sccache
+        uses: mozilla-actions/sccache-action@v0.0.9
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+      - name: Cache Cargo registry and git
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.toml', '**/Cargo.lock') }}
+          restore-keys: |
+            cargo-${{ runner.os }}-
       - name: Setup build environment
         id: setup
         run: |
@@ -190,6 +218,9 @@ jobs:
           else
             echo "failed_projects=[]" >> $GITHUB_OUTPUT
           fi
+      - name: Show sccache stats
+        if: always()
+        run: sccache --show-stats
 
   summary:
     needs: [changes, build-and-test]
