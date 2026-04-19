@@ -1,6 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::token_interface::{
-    transfer_checked, Mint, TokenAccount, TokenInterface, TransferChecked,
+    close_account, transfer_checked, CloseAccount, Mint, TokenAccount, TokenInterface,
+    TransferChecked,
 };
 
 /// Transfer SPL tokens from a user-controlled account to a program-controlled
@@ -48,4 +49,29 @@ pub fn transfer_tokens_from_vault<'info>(
         amount,
         mint.decimals,
     )
+}
+
+/// Close a PDA-owned SPL token vault and forward its rent-exempt lamports to
+/// `destination`. The vault is its own token-account authority, so the caller
+/// just passes the same vault `AccountInfo` as both the account and the
+/// authority, with the vault's signer seeds for the CPI.
+///
+/// `destination` is an `AccountInfo` so callers can pass whichever wrapper
+/// they hold (`Signer`, `UncheckedAccount`, etc.) via `.to_account_info()`.
+pub fn close_vault<'info>(
+    vault: &InterfaceAccount<'info, TokenAccount>,
+    destination: &AccountInfo<'info>,
+    token_program: &Interface<'info, TokenInterface>,
+    signer_seeds: &[&[&[u8]]],
+) -> Result<()> {
+    let accounts = CloseAccount {
+        account: vault.to_account_info(),
+        destination: destination.clone(),
+        authority: vault.to_account_info(),
+    };
+    close_account(CpiContext::new_with_signer(
+        token_program.key(),
+        accounts,
+        signer_seeds,
+    ))
 }

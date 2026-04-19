@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{close_account, CloseAccount, Mint, TokenAccount, TokenInterface},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
 use crate::{
@@ -10,7 +10,10 @@ use crate::{
         PYTH_MAX_AGE_SECONDS,
     },
     errors::AssetLeasingError,
-    instructions::{pay_rent::compute_rent_due, shared::transfer_tokens_from_vault},
+    instructions::{
+        pay_rent::compute_rent_due,
+        shared::{close_vault, transfer_tokens_from_vault},
+    },
     state::{Lease, LeaseStatus},
 };
 
@@ -233,13 +236,13 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
     // the rent-exempt lamports.
     close_vault(
         &context.accounts.leased_vault,
-        &context.accounts.lessor,
+        &context.accounts.lessor.to_account_info(),
         &context.accounts.token_program,
         &[leased_vault_seeds],
     )?;
     close_vault(
         &context.accounts.collateral_vault,
-        &context.accounts.lessor,
+        &context.accounts.lessor.to_account_info(),
         &context.accounts.token_program,
         &[collateral_vault_seeds],
     )?;
@@ -301,22 +304,4 @@ fn ten_pow(exponent: u32) -> Result<u128> {
     10u128
         .checked_pow(exponent)
         .ok_or(AssetLeasingError::MathOverflow.into())
-}
-
-fn close_vault<'info>(
-    vault: &InterfaceAccount<'info, TokenAccount>,
-    destination: &UncheckedAccount<'info>,
-    token_program: &Interface<'info, TokenInterface>,
-    signer_seeds: &[&[&[u8]]],
-) -> Result<()> {
-    let accounts = CloseAccount {
-        account: vault.to_account_info(),
-        destination: destination.to_account_info(),
-        authority: vault.to_account_info(),
-    };
-    close_account(CpiContext::new_with_signer(
-        token_program.key(),
-        accounts,
-        signer_seeds,
-    ))
 }

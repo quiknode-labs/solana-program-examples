@@ -1,13 +1,13 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{close_account, CloseAccount, Mint, TokenAccount, TokenInterface},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
 use crate::{
     constants::{COLLATERAL_VAULT_SEED, LEASED_VAULT_SEED, LEASE_SEED},
     errors::AssetLeasingError,
-    instructions::shared::transfer_tokens_from_vault,
+    instructions::shared::{close_vault, transfer_tokens_from_vault},
     state::{Lease, LeaseStatus},
 };
 
@@ -141,13 +141,13 @@ pub fn handle_close_expired(context: Context<CloseExpired>) -> Result<()> {
 
     close_vault(
         &context.accounts.leased_vault,
-        &context.accounts.lessor,
+        &context.accounts.lessor.to_account_info(),
         &context.accounts.token_program,
         &[leased_vault_seeds],
     )?;
     close_vault(
         &context.accounts.collateral_vault,
-        &context.accounts.lessor,
+        &context.accounts.lessor.to_account_info(),
         &context.accounts.token_program,
         &[collateral_vault_seeds],
     )?;
@@ -156,22 +156,4 @@ pub fn handle_close_expired(context: Context<CloseExpired>) -> Result<()> {
     context.accounts.lease.status = LeaseStatus::Closed;
 
     Ok(())
-}
-
-fn close_vault<'info>(
-    vault: &InterfaceAccount<'info, TokenAccount>,
-    destination: &Signer<'info>,
-    token_program: &Interface<'info, TokenInterface>,
-    signer_seeds: &[&[&[u8]]],
-) -> Result<()> {
-    let accounts = CloseAccount {
-        account: vault.to_account_info(),
-        destination: destination.to_account_info(),
-        authority: vault.to_account_info(),
-    };
-    close_account(CpiContext::new_with_signer(
-        token_program.key(),
-        accounts,
-        signer_seeds,
-    ))
 }

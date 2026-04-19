@@ -1,7 +1,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
     associated_token::AssociatedToken,
-    token_interface::{close_account, CloseAccount, Mint, TokenAccount, TokenInterface},
+    token_interface::{Mint, TokenAccount, TokenInterface},
 };
 
 use crate::{
@@ -9,7 +9,7 @@ use crate::{
     errors::AssetLeasingError,
     instructions::{
         pay_rent::{compute_rent_due, update_last_paid_ts},
-        shared::{transfer_tokens_from_user, transfer_tokens_from_vault},
+        shared::{close_vault, transfer_tokens_from_user, transfer_tokens_from_vault},
     },
     state::{Lease, LeaseStatus},
 };
@@ -183,13 +183,13 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
     // lessor — the lessee only pays for the temporary state they held.
     close_vault(
         &context.accounts.leased_vault,
-        &context.accounts.lessor,
+        &context.accounts.lessor.to_account_info(),
         &context.accounts.token_program,
         &[leased_vault_seeds],
     )?;
     close_vault(
         &context.accounts.collateral_vault,
-        &context.accounts.lessor,
+        &context.accounts.lessor.to_account_info(),
         &context.accounts.token_program,
         &[collateral_vault_seeds],
     )?;
@@ -199,22 +199,4 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
     context.accounts.lease.status = LeaseStatus::Closed;
 
     Ok(())
-}
-
-fn close_vault<'info>(
-    vault: &InterfaceAccount<'info, TokenAccount>,
-    destination: &UncheckedAccount<'info>,
-    token_program: &Interface<'info, TokenInterface>,
-    signer_seeds: &[&[&[u8]]],
-) -> Result<()> {
-    let accounts = CloseAccount {
-        account: vault.to_account_info(),
-        destination: destination.to_account_info(),
-        authority: vault.to_account_info(),
-    };
-    close_account(CpiContext::new_with_signer(
-        token_program.key(),
-        accounts,
-        signer_seeds,
-    ))
 }
