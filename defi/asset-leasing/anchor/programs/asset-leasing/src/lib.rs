@@ -27,6 +27,7 @@ pub mod asset_leasing {
         duration_seconds: i64,
         maintenance_margin_bps: u16,
         liquidation_bounty_bps: u16,
+        feed_id: [u8; 32],
     ) -> Result<()> {
         instructions::create_lease::handle_create_lease(
             context,
@@ -37,6 +38,7 @@ pub mod asset_leasing {
             duration_seconds,
             maintenance_margin_bps,
             liquidation_bounty_bps,
+            feed_id,
         )
     }
 

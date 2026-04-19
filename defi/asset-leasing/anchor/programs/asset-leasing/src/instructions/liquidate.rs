@@ -109,15 +109,17 @@ pub struct Liquidate<'info> {
 /// feed_id(32) | price(i64) | conf(u64) | exponent(i32) | publish_time(i64) |
 /// prev_publish_time(i64) | ema_price(i64) | ema_conf(u64) | posted_slot(u64)]`.
 pub struct DecodedPriceUpdate {
+    pub feed_id: [u8; 32],
     pub price: i64,
     pub exponent: i32,
     pub publish_time: i64,
 }
 
 pub fn decode_price_update(data: &[u8]) -> Result<DecodedPriceUpdate> {
-    // Discriminator (8) + write_authority (32) + verification_level (1) +
-    // feed_id (32) = 73 bytes before the fields we care about.
-    const PRICE_OFFSET: usize = 73;
+    // Discriminator (8) + write_authority (32) + verification_level (1) = 41.
+    const FEED_ID_OFFSET: usize = 41;
+    // feed_id (32) starts at 41, price i64 at 41 + 32 = 73.
+    const PRICE_OFFSET: usize = FEED_ID_OFFSET + 32;
     const EXPONENT_OFFSET: usize = PRICE_OFFSET + 8 + 8; // price + conf
     const PUBLISH_TIME_OFFSET: usize = EXPONENT_OFFSET + 4; // exponent
     const MIN_LEN: usize = PUBLISH_TIME_OFFSET + 8;
@@ -127,6 +129,9 @@ pub fn decode_price_update(data: &[u8]) -> Result<DecodedPriceUpdate> {
         data[..8] == PRICE_UPDATE_V2_DISCRIMINATOR,
         AssetLeasingError::StalePrice
     );
+
+    let mut feed_id = [0u8; 32];
+    feed_id.copy_from_slice(&data[FEED_ID_OFFSET..FEED_ID_OFFSET + 32]);
 
     let price = i64::from_le_bytes(data[PRICE_OFFSET..PRICE_OFFSET + 8].try_into().unwrap());
     let exponent = i32::from_le_bytes(
@@ -141,6 +146,7 @@ pub fn decode_price_update(data: &[u8]) -> Result<DecodedPriceUpdate> {
     );
 
     Ok(DecodedPriceUpdate {
+        feed_id,
         price,
         exponent,
         publish_time,
@@ -152,6 +158,16 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
     let price_data = context.accounts.price_update.try_borrow_data()?;
     let decoded = decode_price_update(&price_data)?;
     drop(price_data);
+
+    // Feed pinning: reject any `PriceUpdateV2` whose feed_id does not match
+    // the one the lessor committed to at `create_lease`. Without this guard,
+    // a keeper could pass in any feed the Pyth Receiver program owns — e.g.
+    // a wildly volatile pair that dips enough to flag the position as
+    // underwater — and trigger a spurious liquidation.
+    require!(
+        decoded.feed_id == context.accounts.lease.feed_id,
+        AssetLeasingError::PriceFeedMismatch
+    );
 
     require!(
         is_underwater(&context.accounts.lease, &decoded, now)?,

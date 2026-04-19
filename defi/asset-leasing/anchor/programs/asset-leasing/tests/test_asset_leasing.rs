@@ -171,6 +171,7 @@ fn build_create_lease_ix(
     duration_seconds: i64,
     maintenance_margin_bps: u16,
     liquidation_bounty_bps: u16,
+    feed_id: [u8; 32],
 ) -> Instruction {
     let (lease, leased_vault, collateral_vault) =
         lease_pdas(&sc.program_id, &sc.lessor.pubkey(), lease_id);
@@ -184,6 +185,7 @@ fn build_create_lease_ix(
             duration_seconds,
             maintenance_margin_bps,
             liquidation_bounty_bps,
+            feed_id,
         }
         .data(),
         asset_leasing::accounts::CreateLease {
@@ -349,7 +351,12 @@ fn build_close_expired_ix(sc: &Scenario, lease_id: u64) -> Instruction {
 /// Build a minimal `PriceUpdateV2` account body with the requested price and
 /// exponent, timestamped `publish_time`. Fields not used by the program are
 /// filled with zero bytes.
-fn build_price_update_data(price: i64, exponent: i32, publish_time: i64) -> Vec<u8> {
+fn build_price_update_data(
+    feed_id: [u8; 32],
+    price: i64,
+    exponent: i32,
+    publish_time: i64,
+) -> Vec<u8> {
     // Size layout:
     // 8 disc + 32 write_authority + 1 verification_level + 32 feed_id +
     // 8 price + 8 conf + 4 exponent + 8 publish_time + 8 prev_publish_time +
@@ -361,8 +368,7 @@ fn build_price_update_data(price: i64, exponent: i32, publish_time: i64) -> Vec<
     data.extend_from_slice(&[0u8; 32]);
     // verification_level = Full (1).
     data.push(1);
-    // feed_id — arbitrary; not checked by the program.
-    data.extend_from_slice(&[0xAB; 32]);
+    data.extend_from_slice(&feed_id);
     data.extend_from_slice(&price.to_le_bytes());
     data.extend_from_slice(&0u64.to_le_bytes()); // conf
     data.extend_from_slice(&exponent.to_le_bytes());
@@ -378,11 +384,12 @@ fn build_price_update_data(price: i64, exponent: i32, publish_time: i64) -> Vec<
 fn mock_price_update(
     svm: &mut LiteSVM,
     address: Pubkey,
+    feed_id: [u8; 32],
     price: i64,
     exponent: i32,
     publish_time: i64,
 ) {
-    let data = build_price_update_data(price, exponent, publish_time);
+    let data = build_price_update_data(feed_id, price, exponent, publish_time);
     let lamports = svm.minimum_balance_for_rent_exemption(data.len());
     let owner: Pubkey = PYTH_RECEIVER_PROGRAM_ID_STR.parse().unwrap();
     svm.set_account(
@@ -409,6 +416,11 @@ const RENT_PER_SECOND: u64 = 10; // 10 base-units / sec
 const DURATION_SECONDS: i64 = 60 * 60 * 24; // 24h
 const MAINTENANCE_MARGIN_BPS: u16 = 12_000; // 120%
 const LIQUIDATION_BOUNTY_BPS: u16 = 500; // 5%
+// Arbitrary 32-byte Pyth feed id the tests pin their leases to. The
+// mocked `PriceUpdateV2` accounts carry the same id so the feed-pinning
+// check in liquidate passes. `liquidate_rejects_mismatched_price_feed`
+// flips one byte of this to prove the check rejects foreign feeds.
+const FEED_ID: [u8; 32] = [0xAB; 32];
 
 #[test]
 fn create_lease_locks_tokens_and_lists() {
@@ -424,6 +436,7 @@ fn create_lease_locks_tokens_and_lists() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     send_transaction_from_instructions(&mut sc.svm, vec![ix], &[&sc.lessor], &sc.lessor.pubkey())
         .unwrap();
@@ -467,6 +480,7 @@ fn take_lease_posts_collateral_and_delivers_tokens() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     send_transaction_from_instructions(
         &mut sc.svm,
@@ -520,6 +534,7 @@ fn pay_rent_streams_collateral_by_elapsed_time() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     let take_ix = build_take_lease_ix(&sc, lease_id);
     send_transaction_from_instructions(
@@ -569,6 +584,7 @@ fn top_up_collateral_increases_vault_balance() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     let take_ix = build_take_lease_ix(&sc, lease_id);
     send_transaction_from_instructions(
@@ -610,6 +626,7 @@ fn return_lease_refunds_unused_collateral() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     let take_ix = build_take_lease_ix(&sc, lease_id);
     send_transaction_from_instructions(
@@ -675,6 +692,7 @@ fn liquidate_seizes_collateral_on_price_drop() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     let take_ix = build_take_lease_ix(&sc, lease_id);
     send_transaction_from_instructions(
@@ -698,6 +716,7 @@ fn liquidate_seizes_collateral_on_price_drop() {
     mock_price_update(
         &mut sc.svm,
         price_update_key.pubkey(),
+        FEED_ID,
         4,
         0,
         now, // fresh publish_time
@@ -751,6 +770,7 @@ fn liquidate_rejects_healthy_position() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     let take_ix = build_take_lease_ix(&sc, lease_id);
     send_transaction_from_instructions(
@@ -766,7 +786,7 @@ fn liquidate_rejects_healthy_position() {
     // to fail with `PositionHealthy`.
     let price_update_key = Keypair::new();
     let now = current_clock(&sc.svm);
-    mock_price_update(&mut sc.svm, price_update_key.pubkey(), 1, 0, now);
+    mock_price_update(&mut sc.svm, price_update_key.pubkey(), FEED_ID, 1, 0, now);
 
     let liq_ix = build_liquidate_ix(&sc, lease_id, price_update_key.pubkey());
     let result = send_transaction_from_instructions(
@@ -776,6 +796,68 @@ fn liquidate_rejects_healthy_position() {
         &sc.keeper.pubkey(),
     );
     assert!(result.is_err(), "healthy liquidation must fail");
+}
+
+#[test]
+fn liquidate_rejects_mismatched_price_feed() {
+    // The lessor pinned FEED_ID; we hand the handler a price update whose
+    // internal feed_id is different. Even when the price would push the
+    // position underwater, the liquidate call must bail with
+    // `PriceFeedMismatch` before running the undercollateralisation check.
+    let mut sc = full_setup();
+    let lease_id = 100u64;
+
+    let create_ix = build_create_lease_ix(
+        &sc,
+        lease_id,
+        LEASED_AMOUNT,
+        REQUIRED_COLLATERAL,
+        RENT_PER_SECOND,
+        DURATION_SECONDS,
+        MAINTENANCE_MARGIN_BPS,
+        LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
+    );
+    let take_ix = build_take_lease_ix(&sc, lease_id);
+    send_transaction_from_instructions(
+        &mut sc.svm,
+        vec![create_ix, take_ix],
+        &[&sc.lessor, &sc.lessee],
+        &sc.lessor.pubkey(),
+    )
+    .unwrap();
+
+    // Flip every byte — any 32-byte feed id other than FEED_ID should do.
+    let wrong_feed_id = [0xCD; 32];
+
+    // Price that *would* trigger liquidation (debt 400 vs 200 collateral,
+    // same as `liquidate_seizes_collateral_on_price_drop`) — except this
+    // update carries the wrong feed id.
+    let price_update_key = Keypair::new();
+    let now = current_clock(&sc.svm);
+    mock_price_update(
+        &mut sc.svm,
+        price_update_key.pubkey(),
+        wrong_feed_id,
+        4,
+        0,
+        now,
+    );
+
+    let liq_ix = build_liquidate_ix(&sc, lease_id, price_update_key.pubkey());
+    let result = send_transaction_from_instructions(
+        &mut sc.svm,
+        vec![liq_ix],
+        &[&sc.keeper],
+        &sc.keeper.pubkey(),
+    );
+    let err = result.expect_err("liquidate must reject foreign price feeds");
+    let rendered = format!("{err:?}");
+    // PriceFeedMismatch is the 16th error in the enum (index 15) → 0x177f.
+    assert!(
+        rendered.contains("PriceFeedMismatch") || rendered.contains("0x177f"),
+        "unexpected failure mode: {rendered}"
+    );
 }
 
 #[test]
@@ -792,6 +874,7 @@ fn close_expired_reclaims_collateral_after_end_ts() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     let take_ix = build_take_lease_ix(&sc, lease_id);
     send_transaction_from_instructions(
@@ -848,6 +931,7 @@ fn close_expired_cancels_listed_lease() {
         DURATION_SECONDS,
         MAINTENANCE_MARGIN_BPS,
         LIQUIDATION_BOUNTY_BPS,
+        FEED_ID,
     );
     send_transaction_from_instructions(
         &mut sc.svm,
@@ -904,6 +988,7 @@ fn create_lease_rejects_same_mint_for_leased_and_collateral() {
             duration_seconds: DURATION_SECONDS,
             maintenance_margin_bps: MAINTENANCE_MARGIN_BPS,
             liquidation_bounty_bps: LIQUIDATION_BOUNTY_BPS,
+            feed_id: FEED_ID,
         }
         .data(),
         asset_leasing::accounts::CreateLease {

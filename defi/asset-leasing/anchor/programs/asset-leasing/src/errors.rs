@@ -32,4 +32,6 @@ pub enum AssetLeasingError {
     Unauthorised,
     #[msg("Leased mint and collateral mint must be different")]
     LeasedMintEqualsCollateralMint,
+    #[msg("Price update does not match the feed pinned on this lease")]
+    PriceFeedMismatch,
 }

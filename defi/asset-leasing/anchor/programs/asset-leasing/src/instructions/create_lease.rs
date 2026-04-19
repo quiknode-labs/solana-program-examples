@@ -79,6 +79,7 @@ pub fn handle_create_lease(
     duration_seconds: i64,
     maintenance_margin_bps: u16,
     liquidation_bounty_bps: u16,
+    feed_id: [u8; 32],
 ) -> Result<()> {
     // Reject leased_mint == collateral_mint. Allowing both to be the same SPL
     // mint would collapse the two vaults' seed derivations into one shared
@@ -139,6 +140,7 @@ pub fn handle_create_lease(
         last_rent_paid_ts: 0,
         maintenance_margin_bps,
         liquidation_bounty_bps,
+        feed_id,
         status: LeaseStatus::Listed,
         bump: context.bumps.lease,
         leased_vault_bump: context.bumps.leased_vault,

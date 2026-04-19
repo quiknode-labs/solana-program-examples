@@ -58,6 +58,13 @@ pub struct Lease {
     /// lease, expressed in basis points of `collateral_amount`.
     pub liquidation_bounty_bps: u16,
 
+    /// Pyth `PriceUpdateV2.feed_id` that this lease is pinned to. The
+    /// liquidation handler refuses price updates whose on-account `feed_id`
+    /// does not match this value, so a keeper cannot swap in an unrelated
+    /// feed (e.g. a cheaper or more volatile pair) to force a liquidation.
+    /// Chosen by the lessor at `create_lease`.
+    pub feed_id: [u8; 32],
+
     /// Current lifecycle state.
     pub status: LeaseStatus,
 
