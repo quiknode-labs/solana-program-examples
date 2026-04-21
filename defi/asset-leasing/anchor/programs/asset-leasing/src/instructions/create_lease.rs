@@ -81,7 +81,7 @@ pub fn handle_create_lease(
     liquidation_bounty_bps: u16,
     feed_id: [u8; 32],
 ) -> Result<()> {
-    // Reject leased_mint == collateral_mint. Allowing both to be the same SPL
+    // Reject leased_mint == collateral_mint. Allowing both to be the same
     // mint would collapse the two vaults' seed derivations into one shared
     // token-balance pool, making rent-vs-collateral accounting ambiguous and
     // enabling griefing paths where the lessee's "collateral" is the same

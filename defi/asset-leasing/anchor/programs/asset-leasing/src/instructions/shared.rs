@@ -4,7 +4,7 @@ use anchor_spl::token_interface::{
     TransferChecked,
 };
 
-/// Transfer SPL tokens from a user-controlled account to a program-controlled
+/// Transfer tokens from a user-controlled account to a program-controlled
 /// vault (or any other account the signer owns). Authority is a plain signer.
 pub fn transfer_tokens_from_user<'info>(
     from: &InterfaceAccount<'info, TokenAccount>,
@@ -27,8 +27,8 @@ pub fn transfer_tokens_from_user<'info>(
     )
 }
 
-/// Transfer SPL tokens out of a PDA-owned vault using the supplied signer
-/// seeds. Used by the program when moving tokens held under its authority.
+/// Transfer tokens out of a PDA-owned vault using the supplied signer seeds.
+/// Used by the program when moving tokens held under its authority.
 pub fn transfer_tokens_from_vault<'info>(
     from: &InterfaceAccount<'info, TokenAccount>,
     to: &InterfaceAccount<'info, TokenAccount>,
@@ -51,7 +51,7 @@ pub fn transfer_tokens_from_vault<'info>(
     )
 }
 
-/// Close a PDA-owned SPL token vault and forward its rent-exempt lamports to
+/// Close a PDA-owned token vault and forward its rent-exempt lamports to
 /// `destination`. The vault is its own token-account authority, so the caller
 /// just passes the same vault `AccountInfo` as both the account and the
 /// authority, with the vault's signer seeds for the CPI.

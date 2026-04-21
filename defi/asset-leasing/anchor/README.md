@@ -1,44 +1,47 @@
 # Asset Leasing
 
-A fixed-term SPL-token lease on Solana, with a second-by-second rent
-stream, a separate collateral deposit, and a Pyth-oracle-triggered
-seizure path when the collateral is no longer worth enough.
+A fixed-term token lease on Solana, with a second-by-second rent stream,
+a separate collateral deposit, and a Pyth-oracle-triggered seizure path
+when the collateral is no longer worth enough.
 
 This README is a teaching document. If you have never written a Solana
 program before and have no background in finance, you are the target
-reader — every term that might be unfamiliar is explained the first time
-it appears, and every instruction is walked through step by step with
+reader — every instruction handler is walked through step by step with
 the exact token movements it causes.
 
 If you already know what collateral, a maintenance margin and an oracle
-are, you can skip straight to the [Accounts and PDAs](#3-accounts-and-pdas)
-or [Instruction lifecycle walkthrough](#4-instruction-lifecycle-walkthrough)
+are, you can skip straight to the [Accounts and PDAs](#2-accounts-and-pdas)
+or [Instruction handler lifecycle walkthrough](#3-instruction-handler-lifecycle-walkthrough)
 sections.
+
+Solana terminology is defined at https://solana.com/docs/terminology.
+Terms specific to this program are explained inline when they first
+appear.
 
 ---
 
 ## Table of contents
 
 1. [What does this program do?](#1-what-does-this-program-do)
-2. [Glossary](#2-glossary)
-3. [Accounts and PDAs](#3-accounts-and-pdas)
-4. [Instruction lifecycle walkthrough](#4-instruction-lifecycle-walkthrough)
-5. [Full-lifecycle worked examples](#5-full-lifecycle-worked-examples)
-6. [Safety and edge cases](#6-safety-and-edge-cases)
-7. [Running the tests](#7-running-the-tests)
+2. [Accounts and PDAs](#2-accounts-and-pdas)
+3. [Instruction handler lifecycle walkthrough](#3-instruction-handler-lifecycle-walkthrough)
+4. [Full-lifecycle worked examples](#4-full-lifecycle-worked-examples)
+5. [Safety and edge cases](#5-safety-and-edge-cases)
+6. [Running the tests](#6-running-the-tests)
+7. [Quasar port](#7-quasar-port)
 8. [Extending the program](#8-extending-the-program)
 
 ---
 
 ## 1. What does this program do?
 
-Two users, a **lessor** and a **lessee**, want to swap SPL tokens
+Two users, a **lessor** and a **lessee**, want to swap tokens
 temporarily:
 
-- The lessor has some number of tokens of SPL mint **A** (call it the
+- The lessor has some number of tokens of mint **A** (call it the
   "leased mint") they would like to hand over for a fixed period of
   time.
-- The lessee has tokens of a different SPL mint **B** (the "collateral
+- The lessee has tokens of a different mint **B** (the "collateral
   mint") they can lock up as a security deposit.
 
 The program acts as a neutral escrow. It:
@@ -48,17 +51,30 @@ The program acts as a neutral escrow. It:
 2. When a lessee calls `take_lease`, the program locks the lessee's B
    tokens as collateral and hands the A tokens to the lessee.
 3. While the lease is live, a second-by-second **rent stream** pays the
-   lessor out of the collateral vault.
+   lessor out of the collateral vault. "Rent" here is the per-second
+   payment the lessee owes the lessor for use of the leased tokens; it
+   is unrelated to Solana account rent (the lamports deposit that keeps
+   an account alive). Same word, different meaning — context usually
+   makes the intent obvious, and where it doesn't the text says so.
 4. If the price of A (measured in B) moves against the lessee far enough
    that the locked collateral is no longer enough to cover the cost of
    re-acquiring the leased tokens, anyone can call `liquidate` — the
-   collateral is seized, most of it goes to the lessor, a small
-   percentage goes to whoever called the liquidation.
+   collateral is seized, most of it goes to the lessor, and a small
+   percentage (the **liquidation bounty**) goes to whoever called it.
+   Such a caller is known as a **keeper** — a bot or anyone else who
+   watches the chain for positions that have gone underwater and earns
+   the bounty by cleaning them up.
 5. If the lessee returns the full A amount before the deadline, they get
    back whatever collateral is left after rent.
 6. If the lessee ghosts past the deadline without returning anything,
    the lessor calls `close_expired` and sweeps the collateral as
    compensation.
+
+The trigger for step 4 is the **maintenance margin**: a ratio,
+expressed in basis points (1 bp = 1/100 of a percent), of required
+collateral value to debt value. `maintenance_margin_bps = 12_000` is
+120%, meaning the collateral must stay worth at least 1.2× the leased
+tokens. Drop below and the position becomes liquidatable.
 
 Nothing mysterious: the program is a pair of vaults, a small piece of
 state that tracks how much rent has been paid, and an oracle check. It
@@ -66,32 +82,37 @@ is written in Anchor.
 
 ### The tradfi picture, briefly
 
-For readers who have never encountered a real-world leasing or margin
-arrangement — two quick analogies. They are strictly optional; the
-program is fully described above in Solana terms.
+For readers who have never encountered a real-world margin or
+securities-lending arrangement — two quick analogies from finance.
+They are strictly optional; the program is fully described above in
+Solana terms.
 
-- **Think of hiring a car.** You pay the rental firm a refundable
-  deposit and a daily fee. If you return the car on time and in one
-  piece, you get the deposit back. If you drive off and disappear, they
-  keep the deposit. Here the lessor is the rental firm, the lessee is
-  you, the leased tokens are the car, and the collateral is the
-  deposit.
+- **Leasing gold bars from a bullion dealer.** The dealer hands over a
+  fixed amount of physical gold for a fixed period; the counterparty
+  pays a per-day leasing fee and posts cash collateral worth more than
+  the gold. If the gold price rises enough that the posted cash no
+  longer covers the value of the bars, the dealer can seize the cash
+  before the position goes further underwater. The leased tokens here
+  play the role of the gold; the collateral plays the role of the cash;
+  the oracle plays the role of a live gold price feed.
 
-- **Think of a pawn shop loan.** You hand over something valuable
-  (collateral), you borrow something in return. If the value of what
-  you handed over drops — for example, if you pawned gold and the gold
-  price collapsed — the shop can sell your collateral before it's worth
-  less than they lent you. On Solana, a price oracle tells the program
-  when that moment has arrived, and `liquidate` does the selling.
+- **Securities lending — borrowing stock to short.** A broker lends
+  shares (say, NVIDIA) to a short seller for a fee. The short seller
+  posts cash collateral worth more than the shares. If NVIDIA rallies,
+  the collateral ratio falls; if it falls far enough, the broker issues
+  a margin call and, if unmet, liquidates the position by buying back
+  the shares from the collateral. This program's `liquidate`
+  instruction handler is the on-chain equivalent of that forced
+  buy-back.
 
-Neither analogy is exact (a car rental doesn't usually charge rent in
-the same asset it took as a deposit, a pawn shop doesn't usually set a
-hard deadline). The onchain mechanics are what matters below.
+Neither analogy is exact — real bullion leases and real securities
+lending add features this example doesn't model (recall rights, rebate
+rates, haircuts). The on-chain mechanics are what matters below.
 
 ### What this example is not
 
 - **It is not a deployed, audited production program.** Treat it as a
-  learning example. It makes simplifying choices (see §6) that a
+  learning example. It makes simplifying choices (see §5) that a
   production lease protocol would need to revisit.
 - **It does not pretend to match mainnet Pyth behaviour exactly.** The
   LiteSVM tests install a hand-rolled `PriceUpdateV2` account; on
@@ -99,169 +120,7 @@ hard deadline). The onchain mechanics are what matters below.
 
 ---
 
-## 2. Glossary
-
-Terms appearing anywhere below, explained in terms of what they are
-mechanically.
-
-**Account**
-: On Solana, every piece of state — a user wallet, a token balance, a
-program's config — is an *account*. An account has an address (a
-32-byte public key), a length, some lamports holding it rent-exempt, an
-owner program (the only program that can mutate the bytes), and a
-byte buffer (`data`).
-
-**Lamport**
-: The smallest unit of SOL. 1 SOL = 10⁹ lamports. Accounts must hold
-enough lamports to be "rent-exempt" for their size; the program
-reimburses these lamports when it closes an account.
-
-**Signer**
-: An account whose private key signed the transaction. Only signers can
-authorise transfers out of accounts they own (including normal
-wallets). The list of signers is attached to every transaction.
-
-**SPL token**
-: Solana's equivalent of an ERC-20. An SPL *mint* account describes
-the token (its supply, decimals, authority). Each user's balance of a
-given mint lives in a separate *token account* owned by the SPL Token
-program.
-
-**Token account**
-: An account that holds a balance of a specific SPL mint, controlled by
-an *authority* (usually a user's wallet pubkey, but can be a PDA). In
-this program, the two vaults are token accounts whose authority is the
-vault PDA itself.
-
-**Associated Token Account (ATA)**
-: A conventional, deterministic token account address for a given
-`(wallet, mint)` pair. Derived by the SPL Associated Token Account
-program. When you send USDC to "someone's wallet", you really mean
-their ATA for the USDC mint. The program creates lessor/lessee ATAs on
-demand (`init_if_needed`) so callers don't have to pre-create them.
-
-**PDA (Program Derived Address)**
-: A deterministic address derived from a list of "seeds" plus a
-program id, via `Pubkey::find_program_address`. PDAs have no private
-key. A program can *sign* as a PDA in a CPI by producing the seeds —
-that's the only way to move tokens out of a PDA-owned vault. In this
-program there are three PDAs per lease: the `Lease` state account, the
-`leased_vault` token account, and the `collateral_vault` token
-account.
-
-**Seeds**
-: The byte strings that, together with the program id, deterministically
-derive a PDA. For this program the seeds are `[b"lease", lessor,
-lease_id]` for the state account and `[b"leased_vault", lease]` /
-`[b"collateral_vault", lease]` for the vaults.
-
-**Bump**
-: A one-byte offset that, together with the seeds, produces an address
-that is *not* on the Ed25519 curve (i.e. has no corresponding private
-key). `find_program_address` finds the highest bump that yields an
-off-curve address. Stored on the `Lease` account so the program doesn't
-have to recompute it every time it signs.
-
-**CPI (Cross-Program Invocation)**
-: One program calling another within the same transaction. The SPL
-Token program's `TransferChecked` and `CloseAccount` instructions are
-the CPIs used here.
-
-**Anchor**
-: A Rust framework for writing Solana programs. The `#[derive(Accounts)]`
-macro generates the account-validation boilerplate — ownership checks,
-signer checks, PDA derivation, constraint checks like `has_one` — from
-struct definitions. The `#[account]` macro handles serialising program
-state accounts with an 8-byte discriminator prefix so the program can
-tell different account types apart.
-
-**Anchor constraint**
-: An attribute on an account field in a `#[derive(Accounts)]` struct,
-like `mut`, `seeds = [...]`, `has_one = lessor`, or
-`constraint = lease.status == LeaseStatus::Active`. Each one expands
-into a check that runs before the handler executes. If any check fails
-the transaction is rejected.
-
-**Discriminator**
-: The first 8 bytes of an Anchor account, equal to the first 8 bytes of
-`sha256("account:<StructName>")`. Anchor writes them at initialisation
-and checks them on every deserialisation so one struct's bytes cannot
-be mistaken for another's.
-
-**Rent (Solana)**
-: The lamports deposit that keeps an account alive. Since it's always
-paid up-front (rent-exempt), you can think of it as a refundable
-security deposit from a payer. When an account is closed the lamports
-are returned to whichever account is specified as `close = ...` in
-Anchor.
-
-**Rent (this program)**
-: The per-second payment the lessee owes the lessor for holding the
-leased tokens. Measured in collateral-mint base units, streams from
-the collateral vault to the lessor's collateral ATA on every
-`pay_rent`. *Unrelated to Solana account rent* — same word, different
-meaning. Context usually makes it obvious.
-
-**Vault**
-: In this codebase, one of the two program-owned token accounts (leased
-or collateral). Their authority is the PDA itself, so the program is
-the only thing that can move funds out of them, and it does so by
-producing the vault's PDA seeds when making the transfer CPI.
-
-**Basis point (bps)**
-: 1/100 of a percent. 10 000 bps = 100%. Used here for the maintenance
-margin and liquidation bounty. Integer-only bps arithmetic keeps all
-percentage calculations free of floating-point error.
-
-**Maintenance margin**
-: A ratio. The liquidation check asks: is the collateral's value (in
-collateral-mint units) at least `maintenance_margin_bps / 10_000`
-times the debt's value (the leased amount, priced into the same
-units)? For `maintenance_margin_bps = 12_000` that is 120%. Drop below
-and the position is liquidatable. This is the "how much cushion must
-the lessee keep on top of the raw value of the leased asset".
-
-**Liquidation**
-: The instruction (`liquidate`) that closes an underwater lease. Rent
-is first paid from the collateral vault; then a percentage (the
-*liquidation bounty*) of whatever collateral is left goes to the
-keeper who called the instruction, and the remainder goes to the
-lessor. Lease status becomes `Liquidated`.
-
-**Keeper**
-: Any party — usually a bot — that calls a permissionless instruction
-to keep the protocol healthy. Here the keeper calls `liquidate` when
-they spot an underwater lease. They are paid the `liquidation_bounty`
-for their trouble.
-
-**Oracle**
-: An onchain account whose bytes are periodically updated with
-information from the outside world — for this program, the current
-price of the leased mint priced in units of the collateral mint. We
-use Pyth's `PriceUpdateV2` accounts.
-
-**Pyth `PriceUpdateV2`**
-: The Pyth receiver program owns a set of accounts, each with a fixed
-layout: discriminator (8) + write_authority (32) + verification_level
-(1) + `feed_id` (32) + price (i64, 8) + conf (u64, 8) + exponent
-(i32, 4) + publish_time (i64, 8) + …. This program only reads
-`feed_id`, `price`, `exponent` and `publish_time`.
-
-**Feed id**
-: A 32-byte identifier for a specific Pyth price feed (e.g.
-"BONK/USD"). Pinned on the `Lease` at creation so a keeper cannot swap
-in a different feed during a liquidation call to force an underwater
-verdict.
-
-**Exponent**
-: Pyth prices are integer pairs `(price, exponent)`; the real price is
-`price * 10^exponent`. For example `(12345, -2)` means 123.45. All of
-this program's math is integer and folds the exponent into whichever
-side of the inequality doesn't already have the denominator applied.
-
----
-
-## 3. Accounts and PDAs
+## 2. Accounts and PDAs
 
 Every call to the program touches some subset of these accounts. The
 three PDAs are created on `create_lease` and destroyed on `return_lease`
@@ -277,8 +136,8 @@ three PDAs are created on `create_lease` and destroyed on `return_lease`
 
 | Account | PDA? | Seeds | Kind | Authority | Holds |
 |---|---|---|---|---|---|
-| `leased_vault` | yes | `["leased_vault", lease]` | SPL token account | itself (PDA-signed) | `leased_amount` while `Listed`; 0 while `Active` (lessee has the tokens); full amount again briefly inside `return_lease` |
-| `collateral_vault` | yes | `["collateral_vault", lease]` | SPL token account | itself (PDA-signed) | 0 while `Listed`; `collateral_amount` while `Active`, decreasing as rent streams out and increasing on `top_up_collateral` |
+| `leased_vault` | yes | `["leased_vault", lease]` | token account | itself (PDA-signed) | `leased_amount` while `Listed`; 0 while `Active` (lessee has the tokens); full amount again briefly inside `return_lease` |
+| `collateral_vault` | yes | `["collateral_vault", lease]` | token account | itself (PDA-signed) | 0 while `Listed`; `collateral_amount` while `Active`, decreasing as rent streams out and increasing on `top_up_collateral` |
 
 ### User accounts passed in
 
@@ -355,16 +214,19 @@ pub struct Lease {
 
 The `Closed` and `Liquidated` states are not directly observable
 onchain: all three of `return_lease`, `liquidate` and `close_expired`
-close the `Lease` account in the same instruction (`close = lessor`),
+close the `Lease` account in the same transaction (`close = lessor`),
 returning the rent-exempt lamports to the lessor. The in-memory
 `status` field is set *before* the close so the transaction logs
 record the terminal state, but the account disappears at the end.
 
 ---
 
-## 4. Instruction lifecycle walkthrough
+## 3. Instruction handler lifecycle walkthrough
 
-The program has seven instructions. The natural order a user encounters
+An *instruction* on Solana is the input sent in a transaction — a
+program id, a list of accounts, and a byte payload. The Rust function
+that runs when one arrives is the *instruction handler*. This program
+has seven instruction handlers. The natural order a user encounters
 them — the order below — is:
 
 1. `create_lease` (lessor)
@@ -385,7 +247,7 @@ Token-flow diagrams use the following shorthand:
   <source account> --[amount of <mint>]--> <destination account>
 ```
 
-### 4.1 `create_lease`
+### 3.1 `create_lease`
 
 **Who calls it:** the lessor. They want to offer some number of leased
 tokens for a fixed term against collateral of a different mint.
@@ -452,7 +314,7 @@ lessee who calls `take_lease` cannot possibly fail because the lessor
 doesn't have the tokens any more — the atomicity guarantee is
 transferred to the PDA the moment the lease is listed.
 
-### 4.2 `take_lease`
+### 3.2 `take_lease`
 
 **Who calls it:** the lessee. They have seen the `Lease` account on
 chain (somehow — an indexer, a direct lookup, whatever) and want to
@@ -500,7 +362,7 @@ collateral back.
 - `lease.last_rent_paid_ts = now` (nothing has accrued yet)
 - `lease.status = Active`
 
-### 4.3 `pay_rent`
+### 3.3 `pay_rent`
 
 **Who calls it:** anyone. The lessee's incentive is obvious (keep the
 lease from going underwater); a keeper bot may also push rent before a
@@ -551,7 +413,7 @@ clean up.
 - `lease.collateral_amount -= payable`
 - `lease.last_rent_paid_ts = now.min(end_ts)`
 
-### 4.4 `top_up_collateral`
+### 3.4 `top_up_collateral`
 
 **Who calls it:** the lessee — to defend against a looming liquidation
 by adding more of the collateral mint to the vault.
@@ -586,7 +448,7 @@ by adding more of the collateral mint to the vault.
 
 - `lease.collateral_amount += amount` (checked add)
 
-### 4.5 `return_lease`
+### 3.5 `return_lease`
 
 **Who calls it:** the lessee, while the lease is still `Active` and
 before or after `end_ts` (the only timing rule is that `status ==
@@ -641,7 +503,7 @@ After the transfers:
 - `lease.collateral_amount = 0`
 - `lease.status = Closed`
 
-### 4.6 `liquidate`
+### 3.6 `liquidate`
 
 **Who calls it:** a keeper, when they can prove the position is
 underwater.
@@ -706,10 +568,10 @@ closed the same way (Anchor `close = lessor`).
 - `lease.last_rent_paid_ts = now.min(end_ts)`
 - `lease.status = Liquidated`
 
-### 4.7 `close_expired`
+### 3.7 `close_expired`
 
 **Who calls it:** the lessor. Two very different situations collapse
-into this single instruction:
+into this single handler:
 
 - **Cancel a `Listed` lease** — the lessor changes their mind, no-one
   has taken the lease yet. Allowed any time.
@@ -763,7 +625,7 @@ closed; all three rent-exempt lamport refunds go to the lessor.
 
 ---
 
-## 5. Full-lifecycle worked examples
+## 4. Full-lifecycle worked examples
 
 All three use the same starting numbers so the arithmetic is easy to
 follow. Both mints are 6-decimal SPL tokens. "LEASED" means one base
@@ -781,7 +643,7 @@ mint.
 Lessor starts with 1 000 000 000 LEASED in their ATA. Lessee starts
 with 1 000 000 000 COLLA in theirs.
 
-### 5.1 Happy path — lessee returns on time
+### 4.1 Happy path — lessee returns on time
 
 Calls, in order:
 
@@ -837,7 +699,7 @@ Calls, in order:
   top-up, got back 249 964 000, so holds 999 964 000 COLLA (net cost
   of 36 000 — exactly the total rent paid).
 
-### 5.2 Liquidation path
+### 4.2 Liquidation path
 
 Same setup. Steps 1 and 2 run identically.
 
@@ -882,7 +744,7 @@ Same setup. Steps 1 and 2 run identically.
 tokens. The collateral pays the lessor for the lost asset. The lessee
 has effectively bought the leased tokens at the forfeit price.)
 
-### 5.3 Default / expiry path — `close_expired` on an `Active` lease
+### 4.3 Default / expiry path — `close_expired` on an `Active` lease
 
 Same setup. Steps 1 and 2 run as usual. The lessee takes the tokens,
 posts collateral, then disappears.
@@ -909,7 +771,7 @@ posts collateral, then disappears.
 - Lessee: 100 000 000 LEASED, −200 000 000 COLLA. They paid the whole
   collateral and kept the leased tokens.
 
-### 5.4 Default / expiry path — `close_expired` on a `Listed` lease
+### 4.4 Default / expiry path — `close_expired` on a `Listed` lease
 
 This is the cheap cancel path. No lessee ever showed up.
 
@@ -928,9 +790,9 @@ else moved.
 
 ---
 
-## 6. Safety and edge cases
+## 5. Safety and edge cases
 
-### 6.1 What the program refuses to do
+### 5.1 What the program refuses to do
 
 All of the following come from [`errors.rs`](programs/asset-leasing/src/errors.rs)
 and are enforced by either an Anchor constraint or a `require!` in the
@@ -951,11 +813,11 @@ handler:
 | `StalePrice` | Pyth price update older than 60 s, or has a future `publish_time`, or fails discriminator / length check |
 | `NonPositivePrice` | Pyth price is `<= 0` |
 | `MathOverflow` | Any of the `checked_*` arithmetic returned `None` |
-| `Unauthorised` | Lease-modifying instruction called by someone who is not the registered lessee (`top_up_collateral`, `return_lease`) |
+| `Unauthorised` | Lease-modifying handler called by someone who is not the registered lessee (`top_up_collateral`, `return_lease`) |
 | `LeasedMintEqualsCollateralMint` | `create_lease` called with the same mint for both sides |
 | `PriceFeedMismatch` | `liquidate` called with a Pyth update whose `feed_id` does not match `lease.feed_id` |
 
-### 6.2 Guarded design choices worth knowing
+### 5.2 Guarded design choices worth knowing
 
 - **Leased tokens are locked up-front.** `create_lease` moves the tokens
   into the `leased_vault` immediately, so a lessee calling `take_lease`
@@ -998,7 +860,7 @@ handler:
   cut would dwarf the lessor's recovery on default. The cap keeps
   liquidation economics roughly in line with lender-first semantics.
 
-### 6.3 Things the program does *not* guard against
+### 5.3 Things the program does *not* guard against
 
 A production lease protocol would want more, but this is an example:
 
@@ -1036,11 +898,11 @@ A production lease protocol would want more, but this is an example:
 
 ---
 
-## 7. Running the tests
+## 6. Running the tests
 
 All the tests are LiteSVM-based Rust integration tests under
 [`programs/asset-leasing/tests/`](programs/asset-leasing/tests/). They
-exercise every instruction through `include_bytes!("../../../target/deploy/asset_leasing.so")`,
+exercise every instruction handler through `include_bytes!("../../../target/deploy/asset_leasing.so")`,
 so a fresh build must produce the `.so` first.
 
 ### Prerequisites
@@ -1109,6 +971,105 @@ CI is already covered.
 
 ---
 
+## 7. Quasar port
+
+A parallel implementation of the same program using
+[Quasar](https://github.com/blueshift-gg/quasar) lives in
+[`../quasar/`](../quasar/). Quasar is a lightweight alternative to
+Anchor that compiles to bare Solana program binaries without pulling in
+`anchor-lang` — useful when you care about compute-unit budget, binary
+size, or simply want fewer layers between your code and the runtime.
+
+The port implements the same seven instruction handlers, the same
+`Lease` state account, the same PDA seed conventions, and produces the
+same on-chain behaviour for every happy-path and adversarial test in
+this README.
+
+### Building and testing
+
+From [`../quasar/`](../quasar/):
+
+```bash
+# Build the .so using the quasar CLI.
+quasar build
+
+# Run the LiteSVM-style tests directly with cargo. The tests call the
+# compiled program from `target/deploy/quasar_asset_leasing.so`.
+cargo test
+```
+
+The Quasar example in this repo's CI workflow
+(`.github/workflows/quasar.yml`) runs exactly those two commands.
+
+### What differs from the Anchor version
+
+- **No Anchor account-validation macros.** In Quasar, account structs
+  use `#[derive(Accounts)]` with an almost-identical attribute
+  vocabulary (`seeds`, `bump`, `has_one`, `constraint`,
+  `init_if_needed`) but the checks are lowered to plain Rust, not
+  inserted by a procedural macro that calls into a support crate.
+
+- **Explicit instruction discriminators.** Each instruction handler
+  carries `#[instruction(discriminator = N)]` with `N` an explicit
+  integer — Quasar uses one-byte discriminators by default rather than
+  Anchor's 8-byte sha256 prefix. The wire format for every call is
+  `[discriminator: u8][borsh-serialised args]`.
+
+- **Tests talk to `QuasarSvm` directly.** Instead of the Anchor
+  `Instruction { ... }.data()` / `accounts::Foo { ... }.to_account_metas()`
+  helpers, the Quasar tests build each `Instruction` by hand with
+  `solana_instruction::AccountMeta` entries and a manually-assembled
+  byte payload. Account state is pre-populated on the SVM with
+  `QuasarSvm::new().with_program(...).with_token_program()` and
+  helpers from `quasar_svm::token` that synthesise `Mint` and
+  `TokenAccount` bytes without running the real token-program
+  initialisation instruction handlers. This keeps the tests fast but
+  means the setup code is more explicit.
+
+- **No cross-program-invocation into an associated-token-account
+  program for ATA creation.** The Anchor version uses `init_if_needed`
+  + `associated_token::...` to let callers pass in a lessor/lessee
+  wallet and get the token account created on demand. The Quasar port
+  accepts pre-created token accounts for the user side of every flow,
+  since doing `init_if_needed` correctly for ATAs in Quasar requires
+  wiring in the ATA program manually and adds noise that distracts
+  from the lease mechanics. Production code would want the ATA
+  convenience back.
+
+- **Classic Token only, not Token-2022.** The Anchor version declares
+  its token accounts as `InterfaceAccount<Token>` + `token_program:
+  Interface<TokenInterface>`, which accepts mints owned by either the
+  classic Token program or the Token-2022 program. The Quasar port
+  uses `Account<Token>` + `Program<Token>`, matching the simpler
+  pattern used by the other Quasar examples in this repo. Adding
+  Token-2022 support is a type-parameter swap away.
+
+- **State layout is the same, byte for byte.** The `Lease` discriminator
+  and field order match the Anchor version, so an off-chain indexer
+  that already decodes Anchor `Lease` accounts would also decode the
+  Quasar ones after adjusting for the one-byte discriminator.
+
+- **One lease per lessor at a time.** The Anchor version keys its
+  `Lease` PDA on `[LEASE_SEED, lessor, lease_id]` so one lessor can
+  run many leases in parallel. Quasar's `seeds = [...]` macro embeds
+  raw references into generated code and does not (yet) have a
+  borrow-safe way to splice instruction args like
+  `lease_id.to_le_bytes()` into the seed list, so the Quasar port
+  keys its PDA on `[LEASE_SEED, lessor]` alone — one active lease per
+  lessor. The `lease_id` is still stored on the `Lease` account for
+  book-keeping and is a caller-supplied u64 in `create_lease`; the
+  off-chain client just has to ensure the previous lease from the same
+  lessor is `Closed` or `Liquidated` (i.e. its PDA account is gone)
+  before creating a new one. Swapping in a multi-lease seed is a
+  mechanical change once Quasar grows support for dynamic-byte seeds.
+
+The code layout mirrors this directory: `src/lib.rs` registers the
+entrypoint and re-exports handlers, `src/state.rs` defines `Lease` and
+`LeaseStatus`, and `src/instructions/*.rs` contains one file per
+handler. Tests are in `src/tests.rs`.
+
+---
+
 ## 8. Extending the program
 
 A few directions that are genuinely educational rather than cargo-cult
@@ -1162,10 +1123,10 @@ extensions:
   second program.
 
 - **Token-2022 support.** The program already uses the `TokenInterface`
-  trait so it accepts both SPL Token and Token-2022 mints. A real
-  extension would test against Token-2022 mint extensions
-  (transfer-fee, interest-bearing) and document which are compatible
-  with the rent / collateral flows.
+  trait so it accepts mints owned by either the classic Token program
+  or the Token-2022 program. A real extension would test against
+  Token-2022 mint extensions (transfer-fee, interest-bearing) and
+  document which are compatible with the rent / collateral flows.
 
 ---
 

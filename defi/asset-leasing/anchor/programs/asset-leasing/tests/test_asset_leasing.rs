@@ -965,7 +965,7 @@ fn close_expired_cancels_listed_lease() {
 
 #[test]
 fn create_lease_rejects_same_mint_for_leased_and_collateral() {
-    // Collapsing leased_mint and collateral_mint into a single SPL mint would
+    // Collapsing leased_mint and collateral_mint into a single mint would
     // also collapse the two vaults into one token-balance pool (same mint,
     // same authority seed pattern) and make rent-vs-collateral accounting
     // ambiguous. The program rejects this up-front with
