@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 use quasar_lang::sysvars::Sysvar;
 use quasar_lang::{
