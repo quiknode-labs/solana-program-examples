@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -24,6 +24,6 @@ mod quasar_favorites {
         number: u64,
         color: String,
     ) -> Result<(), ProgramError> {
-        instructions::handle_set_favorites(&mut ctx.accounts, number, color)
+        ctx.accounts.set_favorites(number, color)
     }
 }

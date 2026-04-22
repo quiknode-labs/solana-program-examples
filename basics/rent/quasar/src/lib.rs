@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -25,6 +25,6 @@ mod quasar_rent {
         name: String,
         address: String,
     ) -> Result<(), ProgramError> {
-        instructions::handle_create_system_account(&mut ctx.accounts, name, address)
+        ctx.accounts.create_system_account(name, address)
     }
 }

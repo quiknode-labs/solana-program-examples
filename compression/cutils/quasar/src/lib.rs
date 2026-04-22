@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -32,12 +32,12 @@ mod quasar_cutils {
     /// Mint a compressed NFT to a collection via MintToCollectionV1.
     #[instruction(discriminator = 0)]
     pub fn mint(ctx: Ctx<Mint>) -> Result<(), ProgramError> {
-        instructions::handle_mint(&ctx.accounts, &ctx)
+        ctx.accounts.mint(&ctx)
     }
 
     /// Verify a compressed NFT leaf exists in the merkle tree.
     #[instruction(discriminator = 1)]
     pub fn verify(ctx: CtxWithRemaining<Verify>) -> Result<(), ProgramError> {
-        instructions::handle_verify(&ctx.accounts, &ctx)
+        ctx.accounts.verify(&ctx)
     }
 }

@@ -11,46 +11,46 @@ use quasar_spl::metadata::{MetadataCpi, MetadataProgram};
 /// `UncheckedAccount` and rely on the Metaplex program itself to validate
 /// the accounts during CPI — the onchain program enforces correctness.
 #[derive(Accounts)]
-pub struct VerifyCollectionMint<'info> {
-    pub authority: &'info Signer,
+pub struct VerifyCollectionMint {
+    pub authority: Signer,
     /// The NFT's metadata account (will be updated with verified=true).
     #[account(mut)]
-    pub metadata: &'info UncheckedAccount,
+    pub metadata: UncheckedAccount,
     /// PDA used as collection authority.
     #[account(seeds = [b"authority"], bump)]
-    pub mint_authority: &'info UncheckedAccount,
+    pub mint_authority: UncheckedAccount,
     /// The collection mint.
-    pub collection_mint: &'info UncheckedAccount,
+    pub collection_mint: UncheckedAccount,
     /// The collection's metadata account.
     #[account(mut)]
-    pub collection_metadata: &'info UncheckedAccount,
+    pub collection_metadata: UncheckedAccount,
     /// The collection's master edition account.
-    pub collection_master_edition: &'info UncheckedAccount,
-    pub system_program: &'info Program<System>,
-    pub token_metadata_program: &'info MetadataProgram,
+    pub collection_master_edition: UncheckedAccount,
+    pub system_program: Program<System>,
+    pub token_metadata_program: MetadataProgram,
 }
 
-#[inline(always)]
-pub fn handle_verify_collection(
-    accounts: &VerifyCollectionMint, bumps: &VerifyCollectionMintBumps,
-) -> Result<(), ProgramError> {
-    let bump = [bumps.mint_authority];
-    let seeds: &[Seed] = &[
-        Seed::from(b"authority" as &[u8]),
-        Seed::from(&bump as &[u8]),
-    ];
+impl VerifyCollectionMint {
+    #[inline(always)]
+    pub fn verify_collection(&mut self, bumps: &VerifyCollectionMintBumps) -> Result<(), ProgramError> {
+        let bump = [bumps.mint_authority];
+        let seeds: &[Seed] = &[
+            Seed::from(b"authority" as &[u8]),
+            Seed::from(&bump as &[u8]),
+        ];
 
-    accounts.token_metadata_program
-        .verify_sized_collection_item(
-            accounts.metadata,
-            accounts.mint_authority,
-            accounts.authority, // payer
-            accounts.collection_mint,
-            accounts.collection_metadata,
-            accounts.collection_master_edition,
-        )
-        .invoke_signed(seeds)?;
+        self.token_metadata_program
+            .verify_sized_collection_item(
+                &self.metadata,
+                &self.mint_authority,
+                &self.authority, // payer
+                &self.collection_mint,
+                &self.collection_metadata,
+                &self.collection_master_edition,
+            )
+            .invoke_signed(seeds)?;
 
-    log("Collection Verified!");
-    Ok(())
+        log("Collection Verified!");
+        Ok(())
+    }
 }

@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -30,6 +30,6 @@ mod quasar_account_data {
         street: String,
         city: String,
     ) -> Result<(), ProgramError> {
-        instructions::handle_create_address_info(&mut ctx.accounts, name, house_number, street, city)
+        ctx.accounts.create_address_info(name, house_number, street, city)
     }
 }

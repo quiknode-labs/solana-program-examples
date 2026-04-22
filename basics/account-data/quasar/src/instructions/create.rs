@@ -7,27 +7,29 @@ use {
 /// Dynamic accounts use owned `Account<T>` rather than `&'info mut Account<T>` because
 /// dynamic types carry cached byte offsets that cannot be represented as a pointer cast.
 #[derive(Accounts)]
-pub struct CreateAddressInfo<'info> {
+pub struct CreateAddressInfo {
     #[account(mut)]
-    pub payer: &'info mut Signer,
-    #[account(mut, init, payer = payer, seeds = [b"address_info", payer], bump)]
-    pub address_info: Account<AddressInfo<'info>>,
-    pub system_program: &'info Program<System>,
+    pub payer: Signer,
+    #[account(mut, init, payer = payer, seeds = AddressInfo::seeds(payer), bump)]
+    pub address_info: Account<AddressInfo<'_>>,
+    pub system_program: Program<System>,
 }
 
-#[inline(always)]
-pub fn handle_create_address_info(
-    accounts: &mut CreateAddressInfo, name: &str,
-    house_number: u8,
-    street: &str,
-    city: &str,
-) -> Result<(), ProgramError> {
-    accounts.address_info.set_inner(
-        house_number,
-        name,
-        street,
-        city,
-        accounts.payer.to_account_view(),
-        None,
-    )
+impl CreateAddressInfo {
+    #[inline(always)]
+    pub fn create_address_info(
+        &mut self, name: &str,
+        house_number: u8,
+        street: &str,
+        city: &str,
+    ) -> Result<(), ProgramError> {
+        self.address_info.set_inner(
+            house_number,
+            name,
+            street,
+            city,
+            self.payer.to_account_view(),
+            None,
+        )
+    }
 }

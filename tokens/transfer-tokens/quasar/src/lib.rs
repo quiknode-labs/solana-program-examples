@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 use quasar_spl::{Mint, Token, TokenCpi};
@@ -20,51 +20,55 @@ mod quasar_transfer_tokens {
     /// Mint tokens to a recipient's token account.
     #[instruction(discriminator = 0)]
     pub fn mint_tokens(ctx: Ctx<MintTokens>, amount: u64) -> Result<(), ProgramError> {
-        handle_mint_tokens(&mut ctx.accounts, amount)
+        ctx.accounts.mint_tokens(amount)
     }
 
     /// Transfer tokens from sender to recipient.
     #[instruction(discriminator = 1)]
     pub fn transfer_tokens(ctx: Ctx<TransferTokens>, amount: u64) -> Result<(), ProgramError> {
-        handle_transfer_tokens(&mut ctx.accounts, amount)
+        ctx.accounts.transfer_tokens(amount)
     }
 }
 
 /// Accounts for minting tokens to a recipient.
 #[derive(Accounts)]
-pub struct MintTokens<'info> {
+pub struct MintTokens {
     #[account(mut)]
-    pub mint_authority: &'info Signer,
+    pub mint_authority: Signer,
     #[account(mut)]
-    pub mint: &'info mut Account<Mint>,
+    pub mint: Account<Mint>,
     /// The recipient's token account. Must already exist.
     #[account(mut)]
-    pub recipient_token_account: &'info mut Account<Token>,
-    pub token_program: &'info Program<Token>,
+    pub recipient_token_account: Account<Token>,
+    pub token_program: Program<Token>,
 }
 
-#[inline(always)]
-pub fn handle_mint_tokens(accounts: &mut MintTokens, amount: u64) -> Result<(), ProgramError> {
-    accounts.token_program
-        .mint_to(accounts.mint, accounts.recipient_token_account, accounts.mint_authority, amount)
-        .invoke()
+impl MintTokens {
+    #[inline(always)]
+    pub fn mint_tokens(&mut self, amount: u64) -> Result<(), ProgramError> {
+        self.token_program
+            .mint_to(&self.mint, &self.recipient_token_account, &self.mint_authority, amount)
+            .invoke()
+    }
 }
 
 /// Accounts for transferring tokens between two token accounts.
 #[derive(Accounts)]
-pub struct TransferTokens<'info> {
+pub struct TransferTokens {
     #[account(mut)]
-    pub sender: &'info Signer,
+    pub sender: Signer,
     #[account(mut)]
-    pub sender_token_account: &'info mut Account<Token>,
+    pub sender_token_account: Account<Token>,
     #[account(mut)]
-    pub recipient_token_account: &'info mut Account<Token>,
-    pub token_program: &'info Program<Token>,
+    pub recipient_token_account: Account<Token>,
+    pub token_program: Program<Token>,
 }
 
-#[inline(always)]
-pub fn handle_transfer_tokens(accounts: &mut TransferTokens, amount: u64) -> Result<(), ProgramError> {
-    accounts.token_program
-        .transfer(accounts.sender_token_account, accounts.recipient_token_account, accounts.sender, amount)
-        .invoke()
+impl TransferTokens {
+    #[inline(always)]
+    pub fn transfer_tokens(&mut self, amount: u64) -> Result<(), ProgramError> {
+        self.token_program
+            .transfer(&self.sender_token_account, &self.recipient_token_account, &self.sender, amount)
+            .invoke()
+    }
 }

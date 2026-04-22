@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -16,11 +16,11 @@ mod quasar_counter {
 
     #[instruction(discriminator = 0)]
     pub fn initialize_counter(ctx: Ctx<InitializeCounter>) -> Result<(), ProgramError> {
-        instructions::handle_initialize_counter(&mut ctx.accounts)
+        ctx.accounts.initialize_counter()
     }
 
     #[instruction(discriminator = 1)]
     pub fn increment(ctx: Ctx<Increment>) -> Result<(), ProgramError> {
-        instructions::handle_increment(&mut ctx.accounts)
+        ctx.accounts.increment()
     }
 }

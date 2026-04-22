@@ -5,14 +5,16 @@ use {
 
 /// Accounts for incrementing a counter.
 #[derive(Accounts)]
-pub struct Increment<'info> {
+pub struct Increment {
     #[account(mut)]
-    pub counter: &'info mut Account<Counter>,
+    pub counter: Account<Counter>,
 }
 
-#[inline(always)]
-pub fn handle_increment(accounts: &mut Increment) -> Result<(), ProgramError> {
-    let current: u64 = accounts.counter.count.into();
-    accounts.counter.count = PodU64::from(current.checked_add(1).unwrap());
-    Ok(())
+impl Increment {
+    #[inline(always)]
+    pub fn increment(&mut self) -> Result<(), ProgramError> {
+        let current: u64 = self.counter.count.into();
+        self.counter.count = PodU64::from(current.checked_add(1).unwrap());
+        Ok(())
+    }
 }

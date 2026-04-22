@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -19,18 +19,18 @@ mod quasar_escrow {
 
     #[instruction(discriminator = 0)]
     pub fn make(ctx: Ctx<Make>, deposit: u64, receive: u64) -> Result<(), ProgramError> {
-        instructions::handle_make_escrow(&mut ctx.accounts, receive, &ctx.bumps)?;
-        instructions::handle_deposit_tokens(&mut ctx.accounts, deposit)
+        ctx.accounts.make_escrow(receive, &ctx.bumps)?;
+        ctx.accounts.deposit_tokens(deposit)
     }
 
     #[instruction(discriminator = 1)]
     pub fn take(ctx: Ctx<Take>) -> Result<(), ProgramError> {
-        instructions::handle_transfer_tokens(&mut ctx.accounts)?;
-        instructions::take::handle_withdraw_tokens_and_close(&mut ctx.accounts, &ctx.bumps)
+        ctx.accounts.transfer_tokens()?;
+        ctx.accounts.withdraw_tokens_and_close(&ctx.bumps)
     }
 
     #[instruction(discriminator = 2)]
     pub fn refund(ctx: Ctx<Refund>) -> Result<(), ProgramError> {
-        instructions::refund::handle_withdraw_tokens_and_close(&mut ctx.accounts, &ctx.bumps)
+        ctx.accounts.withdraw_tokens_and_close(&ctx.bumps)
     }
 }

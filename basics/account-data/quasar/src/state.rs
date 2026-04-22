@@ -6,6 +6,7 @@ use quasar_lang::prelude::*;
 ///
 /// Note: Quasar requires all fixed-size fields to precede dynamic (String/Vec) fields.
 #[account(discriminator = 1)]
+#[seeds(b"address_info", payer: Address)]
 pub struct AddressInfo<'a> {
     pub house_number: u8,
     pub name: String<u8, 50>,

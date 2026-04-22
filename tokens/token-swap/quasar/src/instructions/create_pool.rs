@@ -10,14 +10,14 @@ use {
 /// pool_authority = [amm, mint_a, mint_b, "authority"],
 /// mint_liquidity = [amm, mint_a, mint_b, "liquidity"].
 #[derive(Accounts)]
-pub struct CreatePool<'info> {
+pub struct CreatePool {
     #[account(seeds = [b"amm"], bump)]
-    pub amm: &'info Account<Amm>,
+    pub amm: Account<Amm>,
     #[account(mut, init, payer = payer, seeds = [amm, mint_a, mint_b], bump)]
-    pub pool: &'info mut Account<Pool>,
+    pub pool: Account<Pool>,
     /// Pool authority PDA — signs for pool token operations.
     #[account(seeds = [amm, mint_a, mint_b, crate::AUTHORITY_SEED], bump)]
-    pub pool_authority: &'info UncheckedAccount,
+    pub pool_authority: UncheckedAccount,
     /// Liquidity token mint — created at a PDA.
     #[account(
         mut,
@@ -28,26 +28,28 @@ pub struct CreatePool<'info> {
         mint::decimals = 6,
         mint::authority = pool_authority,
     )]
-    pub mint_liquidity: &'info mut Account<Mint>,
-    pub mint_a: &'info Account<Mint>,
-    pub mint_b: &'info Account<Mint>,
+    pub mint_liquidity: Account<Mint>,
+    pub mint_a: Account<Mint>,
+    pub mint_b: Account<Mint>,
     /// Pool's token A account.
     #[account(mut, init_if_needed, payer = payer, token::mint = mint_a, token::authority = pool_authority)]
-    pub pool_account_a: &'info mut Account<Token>,
+    pub pool_account_a: Account<Token>,
     /// Pool's token B account.
     #[account(mut, init_if_needed, payer = payer, token::mint = mint_b, token::authority = pool_authority)]
-    pub pool_account_b: &'info mut Account<Token>,
+    pub pool_account_b: Account<Token>,
     #[account(mut)]
-    pub payer: &'info Signer,
-    pub token_program: &'info Program<Token>,
-    pub system_program: &'info Program<System>,
-    pub rent: &'info Sysvar<Rent>,
+    pub payer: Signer,
+    pub token_program: Program<Token>,
+    pub system_program: Program<System>,
+    pub rent: Sysvar<Rent>,
 }
 
-#[inline(always)]
-pub fn handle_create_pool(accounts: &mut CreatePool) -> Result<(), ProgramError> {
-    accounts.pool.amm = *accounts.amm.address();
-    accounts.pool.mint_a = *accounts.mint_a.address();
-    accounts.pool.mint_b = *accounts.mint_b.address();
-    Ok(())
+impl CreatePool {
+    #[inline(always)]
+    pub fn create_pool(&mut self) -> Result<(), ProgramError> {
+        self.pool.amm = *self.amm.address();
+        self.pool.mint_a = *self.mint_a.address();
+        self.pool.mint_b = *self.mint_b.address();
+        Ok(())
+    }
 }

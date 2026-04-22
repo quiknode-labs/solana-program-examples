@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::{
     cpi::{CpiCall, InstructionAccount},
@@ -34,83 +34,87 @@ mod quasar_token_2022_basics {
     /// Mint tokens to a recipient's token account.
     #[instruction(discriminator = 0)]
     pub fn mint_token(ctx: Ctx<MintToken>, amount: u64) -> Result<(), ProgramError> {
-        handle_mint_token(&mut ctx.accounts, amount)
+        ctx.accounts.mint_token(amount)
     }
 
     /// Transfer tokens using transfer_checked (required for Token-2022).
     #[instruction(discriminator = 1)]
     pub fn transfer_token(ctx: Ctx<TransferToken>, amount: u64) -> Result<(), ProgramError> {
-        handle_transfer_token(&mut ctx.accounts, amount)
+        ctx.accounts.transfer_token(amount)
     }
 }
 
 /// Accounts for minting tokens via Token-2022.
 #[derive(Accounts)]
-pub struct MintToken<'info> {
+pub struct MintToken {
     #[account(mut)]
-    pub authority: &'info Signer,
+    pub authority: Signer,
     #[account(mut)]
-    pub mint: &'info mut UncheckedAccount,
+    pub mint: UncheckedAccount,
     #[account(mut)]
-    pub receiver: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub receiver: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
-#[inline(always)]
-pub fn handle_mint_token(accounts: &mut MintToken, amount: u64) -> Result<(), ProgramError> {
-    // SPL Token MintTo instruction: opcode 7, amount as u64 LE.
-    let data = build_u64_data(7, amount);
-    CpiCall::new(
-        accounts.token_program.to_account_view().address(),
-        [
-            InstructionAccount::writable(accounts.mint.to_account_view().address()),
-            InstructionAccount::writable(accounts.receiver.to_account_view().address()),
-            InstructionAccount::readonly_signer(accounts.authority.to_account_view().address()),
-        ],
-        [
-            accounts.mint.to_account_view(),
-            accounts.receiver.to_account_view(),
-            accounts.authority.to_account_view(),
-        ],
-        data,
-    )
-    .invoke()
+impl MintToken {
+    #[inline(always)]
+    pub fn mint_token(&mut self, amount: u64) -> Result<(), ProgramError> {
+        // SPL Token MintTo instruction: opcode 7, amount as u64 LE.
+        let data = build_u64_data(7, amount);
+        CpiCall::new(
+            self.token_program.to_account_view().address(),
+            [
+                InstructionAccount::writable(self.mint.to_account_view().address()),
+                InstructionAccount::writable(self.receiver.to_account_view().address()),
+                InstructionAccount::readonly_signer(self.authority.to_account_view().address()),
+            ],
+            [
+                self.mint.to_account_view(),
+                self.receiver.to_account_view(),
+                self.authority.to_account_view(),
+            ],
+            data,
+        )
+        .invoke()
+    }
 }
 
 /// Accounts for transferring tokens via Token-2022 transfer_checked.
 #[derive(Accounts)]
-pub struct TransferToken<'info> {
+pub struct TransferToken {
     #[account(mut)]
-    pub sender: &'info Signer,
+    pub sender: Signer,
     #[account(mut)]
-    pub from: &'info mut UncheckedAccount,
-    pub mint: &'info UncheckedAccount,
+    pub from: UncheckedAccount,
+    pub mint: UncheckedAccount,
     #[account(mut)]
-    pub to: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub to: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
-#[inline(always)]
-pub fn handle_transfer_token(accounts: &mut TransferToken, amount: u64) -> Result<(), ProgramError> {
-    // SPL Token TransferChecked instruction: opcode 12, amount as u64 LE, decimals as u8.
-    let data = build_transfer_checked_data(amount, 6);
-    CpiCall::new(
-        accounts.token_program.to_account_view().address(),
-        [
-            InstructionAccount::writable(accounts.from.to_account_view().address()),
-            InstructionAccount::readonly(accounts.mint.to_account_view().address()),
-            InstructionAccount::writable(accounts.to.to_account_view().address()),
-            InstructionAccount::readonly_signer(accounts.sender.to_account_view().address()),
-        ],
-        [
-            accounts.from.to_account_view(),
-            accounts.mint.to_account_view(),
-            accounts.to.to_account_view(),
-            accounts.sender.to_account_view(),
-        ],
-        data,
-    )
-    .invoke()
+impl TransferToken {
+    #[inline(always)]
+    pub fn transfer_token(&mut self, amount: u64) -> Result<(), ProgramError> {
+        // SPL Token TransferChecked instruction: opcode 12, amount as u64 LE, decimals as u8.
+        let data = build_transfer_checked_data(amount, 6);
+        CpiCall::new(
+            self.token_program.to_account_view().address(),
+            [
+                InstructionAccount::writable(self.from.to_account_view().address()),
+                InstructionAccount::readonly(self.mint.to_account_view().address()),
+                InstructionAccount::writable(self.to.to_account_view().address()),
+                InstructionAccount::readonly_signer(self.sender.to_account_view().address()),
+            ],
+            [
+                self.from.to_account_view(),
+                self.mint.to_account_view(),
+                self.to.to_account_view(),
+                self.sender.to_account_view(),
+            ],
+            data,
+        )
+        .invoke()
+    }
 }
 
 /// Build a 9-byte instruction data: [opcode, u64 LE amount].

@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -32,6 +32,6 @@ mod quasar_cnft_burn {
 
     #[instruction(discriminator = 0)]
     pub fn burn_cnft(ctx: CtxWithRemaining<BurnCnft>) -> Result<(), ProgramError> {
-        instructions::handle_burn_cnft(&ctx.accounts, &ctx)
+        ctx.accounts.burn_cnft(&ctx)
     }
 }

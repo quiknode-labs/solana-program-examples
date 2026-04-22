@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -17,12 +17,12 @@ mod quasar_program_derived_addresses {
     /// Create a PDA-based page visits counter for the payer.
     #[instruction(discriminator = 0)]
     pub fn create_page_visits(ctx: Ctx<CreatePageVisits>) -> Result<(), ProgramError> {
-        instructions::handle_create_page_visits(&mut ctx.accounts)
+        ctx.accounts.create_page_visits()
     }
 
     /// Increment the page visits counter.
     #[instruction(discriminator = 1)]
     pub fn increment_page_visits(ctx: Ctx<IncrementPageVisits>) -> Result<(), ProgramError> {
-        instructions::handle_increment_page_visits(&mut ctx.accounts)
+        ctx.accounts.increment_page_visits()
     }
 }

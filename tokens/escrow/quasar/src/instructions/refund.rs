@@ -5,48 +5,44 @@ use {
 };
 
 #[derive(Accounts)]
-pub struct Refund<'info> {
+pub struct Refund {
     #[account(mut)]
-    pub maker: &'info Signer,
+    pub maker: Signer,
     #[account(
         mut,
         has_one = maker,
         close = maker,
-        seeds = [b"escrow", maker],
+        seeds = Escrow::seeds(maker),
         bump = escrow.bump
     )]
-    pub escrow: &'info mut Account<Escrow>,
-    pub mint_a: &'info Account<Mint>,
+    pub escrow: Account<Escrow>,
+    pub mint_a: Account<Mint>,
     #[account(mut, init_if_needed, payer = maker, token::mint = mint_a, token::authority = maker)]
-    pub maker_ta_a: &'info mut Account<Token>,
+    pub maker_ta_a: Account<Token>,
     #[account(mut)]
-    pub vault_ta_a: &'info mut Account<Token>,
-    pub rent: &'info Sysvar<Rent>,
-    pub token_program: &'info Program<Token>,
-    pub system_program: &'info Program<System>,
+    pub vault_ta_a: Account<Token>,
+    pub rent: Sysvar<Rent>,
+    pub token_program: Program<Token>,
+    pub system_program: Program<System>,
 }
 
-#[inline(always)]
-pub fn handle_withdraw_tokens_and_close(accounts: &mut Refund, bumps: &RefundBumps) -> Result<(), ProgramError> {
-    let maker_key = accounts.escrow.maker;
-    let bump = [bumps.escrow];
-    let seeds: &[Seed] = &[
-        Seed::from(b"escrow" as &[u8]),
-        Seed::from(maker_key.as_ref()),
-        Seed::from(&bump as &[u8]),
-    ];
+impl Refund {
+    #[inline(always)]
+    pub fn withdraw_tokens_and_close(&mut self, bumps: &RefundBumps) -> Result<(), ProgramError> {
+        let seeds = self.escrow_seeds(bumps);
 
-    accounts.token_program
-        .transfer(
-            accounts.vault_ta_a,
-            accounts.maker_ta_a,
-            accounts.escrow,
-            accounts.vault_ta_a.amount(),
-        )
-        .invoke_signed(seeds)?;
+        self.token_program
+            .transfer(
+                &self.vault_ta_a,
+                &self.maker_ta_a,
+                &self.escrow,
+                self.vault_ta_a.amount(),
+            )
+            .invoke_signed(&seeds)?;
 
-    accounts.token_program
-        .close_account(accounts.vault_ta_a, accounts.maker, accounts.escrow)
-        .invoke_signed(seeds)?;
-    Ok(())
+        self.token_program
+            .close_account(&self.vault_ta_a, &self.maker, &self.escrow)
+            .invoke_signed(&seeds)?;
+        Ok(())
+    }
 }

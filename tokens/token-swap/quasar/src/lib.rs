@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -35,12 +35,12 @@ mod quasar_token_swap {
         id: Address,
         fee: u16,
     ) -> Result<(), ProgramError> {
-        instructions::handle_create_amm(&mut ctx.accounts, id, fee)
+        ctx.accounts.create_amm(id, fee)
     }
 
     #[instruction(discriminator = 1)]
     pub fn create_pool(ctx: Ctx<CreatePool>) -> Result<(), ProgramError> {
-        instructions::handle_create_pool(&mut ctx.accounts)
+        ctx.accounts.create_pool()
     }
 
     #[instruction(discriminator = 2)]
@@ -49,7 +49,7 @@ mod quasar_token_swap {
         amount_a: u64,
         amount_b: u64,
     ) -> Result<(), ProgramError> {
-        instructions::handle_deposit_liquidity(&mut ctx.accounts, amount_a, amount_b, &ctx.bumps)
+        ctx.accounts.deposit_liquidity(amount_a, amount_b, &ctx.bumps)
     }
 
     #[instruction(discriminator = 3)]
@@ -57,7 +57,7 @@ mod quasar_token_swap {
         ctx: Ctx<WithdrawLiquidity>,
         amount: u64,
     ) -> Result<(), ProgramError> {
-        instructions::handle_withdraw_liquidity(&mut ctx.accounts, amount, &ctx.bumps)
+        ctx.accounts.withdraw_liquidity(amount, &ctx.bumps)
     }
 
     #[instruction(discriminator = 4)]
@@ -67,6 +67,6 @@ mod quasar_token_swap {
         input_amount: u64,
         min_output_amount: u64,
     ) -> Result<(), ProgramError> {
-        instructions::handle_swap_exact_tokens_for_tokens(&mut ctx.accounts, swap_a, input_amount, min_output_amount, &ctx.bumps)
+        ctx.accounts.swap_exact_tokens_for_tokens(swap_a, input_amount, min_output_amount, &ctx.bumps)
     }
 }

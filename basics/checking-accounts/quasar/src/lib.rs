@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -19,6 +19,6 @@ mod quasar_checking_accounts {
     /// - Program<System>: checks account is executable and is the system program
     #[instruction(discriminator = 0)]
     pub fn check_accounts(ctx: Ctx<CheckAccounts>) -> Result<(), ProgramError> {
-        instructions::handle_check_accounts(&mut ctx.accounts)
+        ctx.accounts.check_accounts()
     }
 }

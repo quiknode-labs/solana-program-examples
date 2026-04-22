@@ -22,7 +22,7 @@ client = []
 debug = []
 
 [dependencies]
-quasar-lang = "0.0"
+quasar-lang = { git = "https://github.com/blueshift-gg/quasar", branch = "master" }
 # Direct dependency for invoke_with_bounds — needed for raw CPI with variable
 # proof accounts. quasar-lang re-exports types but not the invoke functions.
 solana-instruction-view = { version = "2", features = ["cpi"] }

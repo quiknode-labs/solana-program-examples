@@ -8,14 +8,16 @@ use {
 /// In Quasar, we call `close()` explicitly — it zeros the discriminator, drains lamports
 /// to the destination, reassigns the owner to the system program, and resizes to 0.
 #[derive(Accounts)]
-pub struct CloseUser<'info> {
+pub struct CloseUser {
     #[account(mut)]
-    pub user: &'info mut Signer,
+    pub user: Signer,
     #[account(mut)]
-    pub user_account: Account<UserState<'info>>,
+    pub user_account: Account<UserState<'_>>,
 }
 
-#[inline(always)]
-pub fn handle_close_user(accounts: &mut CloseUser) -> Result<(), ProgramError> {
-    accounts.user_account.close(accounts.user.to_account_view())
+impl CloseUser {
+    #[inline(always)]
+    pub fn close_user(&mut self) -> Result<(), ProgramError> {
+        self.user_account.close(self.user.to_account_view())
+    }
 }

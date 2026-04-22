@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -24,24 +24,24 @@ mod quasar_token_fundraiser {
         amount_to_raise: u64,
         duration: u16,
     ) -> Result<(), ProgramError> {
-        instructions::handle_initialize(&mut ctx.accounts, amount_to_raise, duration, ctx.bumps.fundraiser)
+        ctx.accounts.initialize(amount_to_raise, duration, ctx.bumps.fundraiser)
     }
 
     /// Contribute tokens to the fundraiser.
     #[instruction(discriminator = 1)]
     pub fn contribute(ctx: Ctx<Contribute>, amount: u64) -> Result<(), ProgramError> {
-        instructions::handle_contribute(&mut ctx.accounts, amount)
+        ctx.accounts.contribute(amount)
     }
 
     /// Maker withdraws all funds once the target is met.
     #[instruction(discriminator = 2)]
     pub fn check_contributions(ctx: Ctx<CheckContributions>) -> Result<(), ProgramError> {
-        instructions::handle_check_contributions(&mut ctx.accounts, ctx.bumps.fundraiser)
+        ctx.accounts.check_contributions(&ctx.bumps)
     }
 
     /// Contributors reclaim their tokens if the fundraiser fails.
     #[instruction(discriminator = 3)]
     pub fn refund(ctx: Ctx<Refund>) -> Result<(), ProgramError> {
-        instructions::handle_refund(&mut ctx.accounts, ctx.bumps.fundraiser)
+        ctx.accounts.refund(&ctx.bumps)
     }
 }

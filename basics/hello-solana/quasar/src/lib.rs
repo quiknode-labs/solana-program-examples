@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -15,6 +15,6 @@ mod quasar_hello_solana {
 
     #[instruction(discriminator = 0)]
     pub fn hello(ctx: Ctx<Hello>) -> Result<(), ProgramError> {
-        instructions::handle_hello(&mut ctx.accounts)
+        ctx.accounts.hello()
     }
 }

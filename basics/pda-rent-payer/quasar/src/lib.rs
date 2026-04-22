@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -16,13 +16,13 @@ mod quasar_pda_rent_payer {
     /// Fund a PDA "rent vault" by transferring lamports from the payer.
     #[instruction(discriminator = 0)]
     pub fn init_rent_vault(ctx: Ctx<InitRentVault>, fund_lamports: u64) -> Result<(), ProgramError> {
-        instructions::handle_init_rent_vault(&mut ctx.accounts, fund_lamports)
+        ctx.accounts.init_rent_vault(fund_lamports)
     }
 
     /// Create a new account using the rent vault PDA as the funding source.
     /// The vault signs the CPI via PDA seeds.
     #[instruction(discriminator = 1)]
     pub fn create_new_account(ctx: Ctx<CreateNewAccount>) -> Result<(), ProgramError> {
-        instructions::handle_create_new_account(&mut ctx.accounts, ctx.bumps.rent_vault)
+        ctx.accounts.create_new_account(ctx.bumps.rent_vault)
     }
 }

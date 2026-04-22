@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -19,7 +19,7 @@ mod quasar_transfer_sol {
         ctx: Ctx<TransferSolWithCpi>,
         amount: u64,
     ) -> Result<(), ProgramError> {
-        instructions::handle_transfer_sol_with_cpi(&mut ctx.accounts, amount)
+        ctx.accounts.transfer_sol_with_cpi(amount)
     }
 
     /// Transfer SOL by directly manipulating lamports.
@@ -29,6 +29,6 @@ mod quasar_transfer_sol {
         ctx: Ctx<TransferSolWithProgram>,
         amount: u64,
     ) -> Result<(), ProgramError> {
-        instructions::handle_transfer_sol_with_program(&mut ctx.accounts, amount)
+        ctx.accounts.transfer_sol_with_program(amount)
     }
 }

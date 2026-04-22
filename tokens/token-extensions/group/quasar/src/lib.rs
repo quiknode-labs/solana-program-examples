@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::sysvars::Sysvar;
 use quasar_lang::{
@@ -31,71 +31,73 @@ mod quasar_group {
 
     #[instruction(discriminator = 0)]
     pub fn initialize_group(ctx: Ctx<InitializeGroup>) -> Result<(), ProgramError> {
-        handle_initialize(&mut ctx.accounts)
+        ctx.accounts.initialize_group()
     }
 }
 
 #[derive(Accounts)]
-pub struct InitializeGroup<'info> {
+pub struct InitializeGroup {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub mint_account: &'info Signer,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub mint_account: Signer,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
-#[inline(always)]
-pub fn handle_initialize(accounts: &InitializeGroup) -> Result<(), ProgramError> {
-    // Mint + GroupPointer extension = 250 bytes
-    let mint_size: u64 = 250;
-    let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
+impl InitializeGroup {
+    #[inline(always)]
+    pub fn initialize_group(&mut self) -> Result<(), ProgramError> {
+        // Mint + GroupPointer extension = 250 bytes
+        let mint_size: u64 = 250;
+        let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
 
-    accounts.system_program
-        .create_account(
-            accounts.payer,
-            accounts.mint_account,
-            lamports,
-            mint_size,
-            accounts.token_program.to_account_view().address(),
+        self.system_program
+            .create_account(
+                &self.payer,
+                &self.mint_account,
+                lamports,
+                mint_size,
+                self.token_program.to_account_view().address(),
+            )
+            .invoke()?;
+
+        // InitializeGroupPointer: opcode 41, sub-opcode 0
+        // Data: [41, 0, authority (32 bytes), group_address (32 bytes)]
+        let mut ext_data = [0u8; 66];
+        ext_data[0] = 41;
+        ext_data[1] = 0;
+        // authority = mint itself (self-referential PDA pattern)
+        ext_data[2..34].copy_from_slice(self.mint_account.to_account_view().address().as_ref());
+        // group_address = mint itself
+        ext_data[34..66].copy_from_slice(self.mint_account.to_account_view().address().as_ref());
+
+        CpiCall::new(
+            self.token_program.to_account_view().address(),
+            [InstructionAccount::writable(
+                self.mint_account.to_account_view().address(),
+            )],
+            [self.mint_account.to_account_view()],
+            ext_data,
         )
         .invoke()?;
 
-    // InitializeGroupPointer: opcode 41, sub-opcode 0
-    // Data: [41, 0, authority (32 bytes), group_address (32 bytes)]
-    let mut ext_data = [0u8; 66];
-    ext_data[0] = 41;
-    ext_data[1] = 0;
-    // authority = mint itself (self-referential PDA pattern)
-    ext_data[2..34].copy_from_slice(accounts.mint_account.to_account_view().address().as_ref());
-    // group_address = mint itself
-    ext_data[34..66].copy_from_slice(accounts.mint_account.to_account_view().address().as_ref());
+        // InitializeMint2: mint authority = mint itself (for self-signing)
+        let mut mint_data = [0u8; 67];
+        mint_data[0] = 20;
+        mint_data[1] = 2;
+        mint_data[2..34].copy_from_slice(self.mint_account.to_account_view().address().as_ref());
+        mint_data[34] = 1;
+        mint_data[35..67].copy_from_slice(self.mint_account.to_account_view().address().as_ref());
 
-    CpiCall::new(
-        accounts.token_program.to_account_view().address(),
-        [InstructionAccount::writable(
-            accounts.mint_account.to_account_view().address(),
-        )],
-        [accounts.mint_account.to_account_view()],
-        ext_data,
-    )
-    .invoke()?;
-
-    // InitializeMint2: mint authority = mint itself (for self-signing)
-    let mut mint_data = [0u8; 67];
-    mint_data[0] = 20;
-    mint_data[1] = 2;
-    mint_data[2..34].copy_from_slice(accounts.mint_account.to_account_view().address().as_ref());
-    mint_data[34] = 1;
-    mint_data[35..67].copy_from_slice(accounts.mint_account.to_account_view().address().as_ref());
-
-    CpiCall::new(
-        accounts.token_program.to_account_view().address(),
-        [InstructionAccount::writable(
-            accounts.mint_account.to_account_view().address(),
-        )],
-        [accounts.mint_account.to_account_view()],
-        mint_data,
-    )
-    .invoke()
+        CpiCall::new(
+            self.token_program.to_account_view().address(),
+            [InstructionAccount::writable(
+                self.mint_account.to_account_view().address(),
+            )],
+            [self.mint_account.to_account_view()],
+            mint_data,
+        )
+        .invoke()
+    }
 }

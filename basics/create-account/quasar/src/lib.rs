@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -16,6 +16,6 @@ mod quasar_create_account {
     /// Create a new system-owned account via CPI to the system program.
     #[instruction(discriminator = 0)]
     pub fn create_system_account(ctx: Ctx<CreateSystemAccount>) -> Result<(), ProgramError> {
-        instructions::handle_create_system_account(&mut ctx.accounts)
+        ctx.accounts.create_system_account()
     }
 }

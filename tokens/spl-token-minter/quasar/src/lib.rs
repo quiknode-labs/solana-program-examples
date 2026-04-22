@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -25,11 +25,11 @@ mod quasar_spl_token_minter {
         token_symbol: String,
         token_uri: String,
     ) -> Result<(), ProgramError> {
-        instructions::handle_create_token(&mut ctx.accounts, &token_name, &token_symbol, &token_uri)
+        ctx.accounts.create_token(&token_name, &token_symbol, &token_uri)
     }
 
     #[instruction(discriminator = 1)]
     pub fn mint_token(ctx: Ctx<MintToken>, amount: u64) -> Result<(), ProgramError> {
-        instructions::handle_mint_token(&mut ctx.accounts, amount)
+        ctx.accounts.mint_token(amount)
     }
 }

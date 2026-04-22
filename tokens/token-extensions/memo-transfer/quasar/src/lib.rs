@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::sysvars::Sysvar;
 use quasar_lang::{
@@ -27,100 +27,104 @@ mod quasar_memo_transfer {
 
     #[instruction(discriminator = 0)]
     pub fn initialize(ctx: Ctx<Initialize>) -> Result<(), ProgramError> {
-        handle_initialize(&mut ctx.accounts)
+        ctx.accounts.initialize()
     }
 
     #[instruction(discriminator = 1)]
     pub fn disable(ctx: Ctx<Disable>) -> Result<(), ProgramError> {
-        handle_disable(&mut ctx.accounts)
+        ctx.accounts.disable()
     }
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct Initialize {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub token_account: &'info Signer,
-    pub mint_account: &'info UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub token_account: Signer,
+    pub mint_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
-#[inline(always)]
-pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
-    // Token account + MemoTransfer extension = 300 bytes
-    let account_size: u64 = 300;
-    let lamports = Rent::get()?.try_minimum_balance(account_size as usize)?;
+impl Initialize {
+    #[inline(always)]
+    pub fn initialize(&mut self) -> Result<(), ProgramError> {
+        // Token account + MemoTransfer extension = 300 bytes
+        let account_size: u64 = 300;
+        let lamports = Rent::get()?.try_minimum_balance(account_size as usize)?;
 
-    accounts.system_program
-        .create_account(
-            accounts.payer,
-            accounts.token_account,
-            lamports,
-            account_size,
-            accounts.token_program.to_account_view().address(),
+        self.system_program
+            .create_account(
+                &self.payer,
+                &self.token_account,
+                lamports,
+                account_size,
+                self.token_program.to_account_view().address(),
+            )
+            .invoke()?;
+
+        // InitializeAccount3: opcode 18, owner pubkey
+        let mut init_data = [0u8; 33];
+        init_data[0] = 18;
+        init_data[1..33].copy_from_slice(self.payer.to_account_view().address().as_ref());
+
+        CpiCall::new(
+            self.token_program.to_account_view().address(),
+            [
+                InstructionAccount::writable(self.token_account.to_account_view().address()),
+                InstructionAccount::readonly(self.mint_account.to_account_view().address()),
+            ],
+            [
+                self.token_account.to_account_view(),
+                self.mint_account.to_account_view(),
+            ],
+            init_data,
         )
         .invoke()?;
 
-    // InitializeAccount3: opcode 18, owner pubkey
-    let mut init_data = [0u8; 33];
-    init_data[0] = 18;
-    init_data[1..33].copy_from_slice(accounts.payer.to_account_view().address().as_ref());
-
-    CpiCall::new(
-        accounts.token_program.to_account_view().address(),
-        [
-            InstructionAccount::writable(accounts.token_account.to_account_view().address()),
-            InstructionAccount::readonly(accounts.mint_account.to_account_view().address()),
-        ],
-        [
-            accounts.token_account.to_account_view(),
-            accounts.mint_account.to_account_view(),
-        ],
-        init_data,
-    )
-    .invoke()?;
-
-    // MemoTransfer enable: opcode 30, sub-opcode 0
-    CpiCall::new(
-        accounts.token_program.to_account_view().address(),
-        [
-            InstructionAccount::writable(accounts.token_account.to_account_view().address()),
-            InstructionAccount::readonly_signer(accounts.payer.to_account_view().address()),
-        ],
-        [
-            accounts.token_account.to_account_view(),
-            accounts.payer.to_account_view(),
-        ],
-        [30u8, 0],
-    )
-    .invoke()
+        // MemoTransfer enable: opcode 30, sub-opcode 0
+        CpiCall::new(
+            self.token_program.to_account_view().address(),
+            [
+                InstructionAccount::writable(self.token_account.to_account_view().address()),
+                InstructionAccount::readonly_signer(self.payer.to_account_view().address()),
+            ],
+            [
+                self.token_account.to_account_view(),
+                self.payer.to_account_view(),
+            ],
+            [30u8, 0],
+        )
+        .invoke()
+    }
 }
 
 #[derive(Accounts)]
-pub struct Disable<'info> {
+pub struct Disable {
     #[account(mut)]
-    pub owner: &'info Signer,
+    pub owner: Signer,
     #[account(mut)]
-    pub token_account: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub token_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
-#[inline(always)]
-pub fn handle_disable(accounts: &Disable) -> Result<(), ProgramError> {
-    // MemoTransfer disable: opcode 30, sub-opcode 1
-    CpiCall::new(
-        accounts.token_program.to_account_view().address(),
-        [
-            InstructionAccount::writable(accounts.token_account.to_account_view().address()),
-            InstructionAccount::readonly_signer(accounts.owner.to_account_view().address()),
-        ],
-        [
-            accounts.token_account.to_account_view(),
-            accounts.owner.to_account_view(),
-        ],
-        [30u8, 1],
-    )
-    .invoke()
+impl Disable {
+    #[inline(always)]
+    pub fn disable(&mut self) -> Result<(), ProgramError> {
+        // MemoTransfer disable: opcode 30, sub-opcode 1
+        CpiCall::new(
+            self.token_program.to_account_view().address(),
+            [
+                InstructionAccount::writable(self.token_account.to_account_view().address()),
+                InstructionAccount::readonly_signer(self.owner.to_account_view().address()),
+            ],
+            [
+                self.token_account.to_account_view(),
+                self.owner.to_account_view(),
+            ],
+            [30u8, 1],
+        )
+        .invoke()
+    }
 }

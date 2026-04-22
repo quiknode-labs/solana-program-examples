@@ -5,69 +5,65 @@ use {
 };
 
 #[derive(Accounts)]
-pub struct Take<'info> {
+pub struct Take {
     #[account(mut)]
-    pub taker: &'info Signer,
+    pub taker: Signer,
     #[account(
         mut,
         has_one = maker,
         has_one = maker_ta_b,
         constraint = escrow.receive > 0,
         close = taker,
-        seeds = [b"escrow", maker],
+        seeds = Escrow::seeds(maker),
         bump = escrow.bump
     )]
-    pub escrow: &'info mut Account<Escrow>,
+    pub escrow: Account<Escrow>,
     #[account(mut)]
-    pub maker: &'info UncheckedAccount,
-    pub mint_a: &'info Account<Mint>,
-    pub mint_b: &'info Account<Mint>,
+    pub maker: UncheckedAccount,
+    pub mint_a: Account<Mint>,
+    pub mint_b: Account<Mint>,
     #[account(mut, init_if_needed, payer = taker, token::mint = mint_a, token::authority = taker)]
-    pub taker_ta_a: &'info mut Account<Token>,
+    pub taker_ta_a: Account<Token>,
     #[account(mut)]
-    pub taker_ta_b: &'info mut Account<Token>,
+    pub taker_ta_b: Account<Token>,
     #[account(mut, init_if_needed, payer = taker, token::mint = mint_b, token::authority = maker)]
-    pub maker_ta_b: &'info mut Account<Token>,
+    pub maker_ta_b: Account<Token>,
     #[account(mut)]
-    pub vault_ta_a: &'info mut Account<Token>,
-    pub rent: &'info Sysvar<Rent>,
-    pub token_program: &'info Program<Token>,
-    pub system_program: &'info Program<System>,
+    pub vault_ta_a: Account<Token>,
+    pub rent: Sysvar<Rent>,
+    pub token_program: Program<Token>,
+    pub system_program: Program<System>,
 }
 
-#[inline(always)]
-pub fn handle_transfer_tokens(accounts: &mut Take) -> Result<(), ProgramError> {
-    accounts.token_program
-        .transfer(
-            accounts.taker_ta_b,
-            accounts.maker_ta_b,
-            accounts.taker,
-            accounts.escrow.receive,
-        )
-        .invoke()
-}
+impl Take {
+    #[inline(always)]
+    pub fn transfer_tokens(&mut self) -> Result<(), ProgramError> {
+        self.token_program
+            .transfer(
+                &self.taker_ta_b,
+                &self.maker_ta_b,
+                &self.taker,
+                self.escrow.receive,
+            )
+            .invoke()
+    }
 
-#[inline(always)]
-pub fn handle_withdraw_tokens_and_close(accounts: &mut Take, bumps: &TakeBumps) -> Result<(), ProgramError> {
-    let maker_key = accounts.escrow.maker;
-    let bump = [bumps.escrow];
-    let seeds: &[Seed] = &[
-        Seed::from(b"escrow" as &[u8]),
-        Seed::from(maker_key.as_ref()),
-        Seed::from(&bump as &[u8]),
-    ];
+    #[inline(always)]
+    pub fn withdraw_tokens_and_close(&mut self, bumps: &TakeBumps) -> Result<(), ProgramError> {
+        let seeds = self.escrow_seeds(bumps);
 
-    accounts.token_program
-        .transfer(
-            accounts.vault_ta_a,
-            accounts.taker_ta_a,
-            accounts.escrow,
-            accounts.vault_ta_a.amount(),
-        )
-        .invoke_signed(seeds)?;
+        self.token_program
+            .transfer(
+                &self.vault_ta_a,
+                &self.taker_ta_a,
+                &self.escrow,
+                self.vault_ta_a.amount(),
+            )
+            .invoke_signed(&seeds)?;
 
-    accounts.token_program
-        .close_account(accounts.vault_ta_a, accounts.taker, accounts.escrow)
-        .invoke_signed(seeds)?;
-    Ok(())
+        self.token_program
+            .close_account(&self.vault_ta_a, &self.taker, &self.escrow)
+            .invoke_signed(&seeds)?;
+        Ok(())
+    }
 }

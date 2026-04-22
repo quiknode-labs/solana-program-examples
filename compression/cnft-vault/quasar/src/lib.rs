@@ -1,4 +1,4 @@
-#![cfg_attr(not(test), no_std)]
+#![no_std]
 
 use quasar_lang::prelude::*;
 
@@ -33,12 +33,12 @@ mod quasar_cnft_vault {
     /// Withdraw a single compressed NFT from the vault PDA.
     #[instruction(discriminator = 0)]
     pub fn withdraw_cnft(ctx: CtxWithRemaining<Withdraw>) -> Result<(), ProgramError> {
-        instructions::handle_withdraw_cnft(&ctx.accounts, &ctx)
+        ctx.accounts.withdraw_cnft(&ctx)
     }
 
     /// Withdraw two compressed NFTs from the vault PDA in a single transaction.
     #[instruction(discriminator = 1)]
     pub fn withdraw_two_cnfts(ctx: CtxWithRemaining<WithdrawTwo>) -> Result<(), ProgramError> {
-        instructions::handle_withdraw_two_cnfts(&ctx.accounts, &ctx)
+        ctx.accounts.withdraw_two_cnfts(&ctx)
     }
 }
