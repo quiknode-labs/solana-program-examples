@@ -147,11 +147,11 @@ three PDAs are created on `create_lease` and destroyed on `return_lease`
 | `lessee` wallet | user | `take_lease` / `top_up_collateral` / `return_lease` signer |
 | `keeper` wallet | user | `liquidate` signer, receives the bounty |
 | `payer` wallet | user | `pay_rent` signer (can be anyone, not just the lessee) |
-| `lessor_leased_account` | SPL Token | lessor's ATA for the leased mint; source on `create_lease`, destination on `return_lease` / `close_expired` |
-| `lessor_collateral_account` | SPL Token | lessor's ATA for the collateral mint; destination for rent and liquidation proceeds |
-| `lessee_leased_account` | SPL Token | lessee's ATA for the leased mint; destination on `take_lease`, source on `return_lease` |
-| `lessee_collateral_account` | SPL Token | lessee's ATA for the collateral mint; source on `take_lease` / `top_up_collateral`, destination for collateral refund on `return_lease` |
-| `keeper_collateral_account` | SPL Token | keeper's ATA for the collateral mint; receives the liquidation bounty |
+| `lessor_leased_account` | token account | lessor's ATA for the leased mint; source on `create_lease`, destination on `return_lease` / `close_expired` |
+| `lessor_collateral_account` | token account | lessor's ATA for the collateral mint; destination for rent and liquidation proceeds |
+| `lessee_leased_account` | token account | lessee's ATA for the leased mint; destination on `take_lease`, source on `return_lease` |
+| `lessee_collateral_account` | token account | lessee's ATA for the collateral mint; source on `take_lease` / `top_up_collateral`, destination for collateral refund on `return_lease` |
+| `keeper_collateral_account` | token account | keeper's ATA for the collateral mint; receives the liquidation bounty |
 | `price_update` | Pyth Receiver program | `PriceUpdateV2` account for the feed the lease is pinned to |
 
 ### Fields on `Lease`
@@ -628,7 +628,7 @@ closed; all three rent-exempt lamport refunds go to the lessor.
 ## 4. Full-lifecycle worked examples
 
 All three use the same starting numbers so the arithmetic is easy to
-follow. Both mints are 6-decimal SPL tokens. "LEASED" means one base
+follow. Both mints are 6-decimal tokens. "LEASED" means one base
 unit of the leased mint; "COLLA" means one base unit of the collateral
 mint.
 
@@ -824,7 +824,7 @@ handler:
   cannot fail because the lessor spent the funds elsewhere in the
   meantime.
 
-- **Leased mint ≠ collateral mint.** If both sides used the same SPL
+- **Leased mint ≠ collateral mint.** If both sides used the same
   mint, the two vaults would hold the same asset and the
   "what-do-I-owe-vs-what-do-I-hold" accounting would collapse. The
   guard is cheap and the error message is explicit.
