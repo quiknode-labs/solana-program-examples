@@ -13,6 +13,9 @@ extern crate std;
 
 use {
     alloc::{vec, vec::Vec},
+    // Alias the SPL-prefixed constant away: on Solana, "token" is the default;
+    // the "SPL" qualifier is only useful when contrasting with the native token (SOL).
+    quasar_svm::SPL_TOKEN_PROGRAM_ID as TOKEN_PROGRAM_ID,
     quasar_svm::{Account, Instruction, Pubkey, QuasarSvm},
     solana_instruction::AccountMeta,
     spl_token_interface::state::{Account as TokenAccount, AccountState, Mint},
@@ -272,7 +275,7 @@ fn create_lease_call(sc: &Scenario, lease_id: u64) -> (Instruction, Vec<Account>
             AccountMeta::new(sc.leased_vault, false),
             AccountMeta::new(sc.collateral_vault, false),
             AccountMeta::new_readonly(quasar_svm::solana_sdk_ids::sysvar::rent::ID, false),
-            AccountMeta::new_readonly(quasar_svm::SPL_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
             AccountMeta::new_readonly(quasar_svm::system_program::ID, false),
         ],
         data: build_create_lease_data(
@@ -349,7 +352,7 @@ fn create_lease_call_with_mints(
             AccountMeta::new(sc.leased_vault, false),
             AccountMeta::new(sc.collateral_vault, false),
             AccountMeta::new_readonly(quasar_svm::solana_sdk_ids::sysvar::rent::ID, false),
-            AccountMeta::new_readonly(quasar_svm::SPL_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
             AccountMeta::new_readonly(quasar_svm::system_program::ID, false),
         ],
         data: build_create_lease_data(
@@ -435,7 +438,7 @@ fn take_lease_call(sc: &Scenario) -> (Instruction, Vec<Account>) {
             AccountMeta::new(sc.collateral_vault, false),
             AccountMeta::new(sc.lessee_collateral_ta, false),
             AccountMeta::new(sc.lessee_leased_ta, false),
-            AccountMeta::new_readonly(quasar_svm::SPL_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
         ],
         data: vec![1u8], // discriminator = take_lease
     };
@@ -467,7 +470,7 @@ fn pay_rent_call(sc: &Scenario) -> (Instruction, Vec<Account>) {
             AccountMeta::new_readonly(sc.collateral_mint, false),
             AccountMeta::new(sc.collateral_vault, false),
             AccountMeta::new(sc.lessor_collateral_ta, false),
-            AccountMeta::new_readonly(quasar_svm::SPL_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
         ],
         data: vec![2u8],
     };
@@ -492,7 +495,7 @@ fn top_up_call(sc: &Scenario, amount: u64) -> (Instruction, Vec<Account>) {
             AccountMeta::new_readonly(sc.collateral_mint, false),
             AccountMeta::new(sc.collateral_vault, false),
             AccountMeta::new(sc.lessee_collateral_ta, false),
-            AccountMeta::new_readonly(quasar_svm::SPL_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
         ],
         data,
     };
@@ -519,7 +522,7 @@ fn return_lease_call(sc: &Scenario) -> (Instruction, Vec<Account>) {
             AccountMeta::new(sc.lessee_collateral_ta, false),
             AccountMeta::new(sc.lessor_leased_ta, false),
             AccountMeta::new(sc.lessor_collateral_ta, false),
-            AccountMeta::new_readonly(quasar_svm::SPL_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
         ],
         data: vec![4u8],
     };
@@ -547,7 +550,7 @@ fn liquidate_call(sc: &Scenario, price_update: Pubkey) -> (Instruction, Vec<Acco
             AccountMeta::new(sc.lessor_collateral_ta, false),
             AccountMeta::new(sc.keeper_collateral_ta, false),
             AccountMeta::new_readonly(price_update, false),
-            AccountMeta::new_readonly(quasar_svm::SPL_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
         ],
         data: vec![5u8],
     };
@@ -574,7 +577,7 @@ fn close_expired_call(sc: &Scenario) -> (Instruction, Vec<Account>) {
             AccountMeta::new(sc.collateral_vault, false),
             AccountMeta::new(sc.lessor_leased_ta, false),
             AccountMeta::new(sc.lessor_collateral_ta, false),
-            AccountMeta::new_readonly(quasar_svm::SPL_TOKEN_PROGRAM_ID, false),
+            AccountMeta::new_readonly(TOKEN_PROGRAM_ID, false),
         ],
         data: vec![6u8],
     };
