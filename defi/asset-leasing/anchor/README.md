@@ -73,6 +73,31 @@ bounty from the collateral. If the lease term ends without the short
 seller calling `return_lease`, the holder calls `close_expired` to
 seize the collateral and recover.
 
+The holder's full lifecycle is shorter:
+
+1. **List the tokens** by calling `create_lease`. This locks the A
+   tokens in a program-owned vault and publishes the terms (collateral
+   required, lease fee, duration, maintenance margin, liquidation
+   bounty, oracle feed). The lease starts in `Listed` status.
+2. **Wait for a taker.** If a short seller takes the offer (calling
+   `take_lease`), the lease moves to `Active` status and the holder
+   starts earning the per-second lending fee. If no-one takes it, the
+   holder can cancel at any time.
+3. **Earn fees while the lease is `Active`.** The holder doesn't have
+   to call anything; the fee accrues against the short seller's
+   collateral and settles whenever any handler runs against the lease.
+4. **Get paid out at close.** Whichever path the lease takes (clean
+   return, liquidation, or expiry), the holder ends up with their A
+   tokens back (or, on liquidation/expiry default, the equivalent
+   value in B as compensation) plus all the lease fees that accrued.
+
+The holder can call `close_expired` to terminate the lease in two
+situations: (a) the lease is `Listed` and they want to cancel it
+before any short seller takes it, or (b) the lease is `Active`, the
+deadline has passed, and the short seller hasn't returned the tokens -
+in which case the holder seizes the entire collateral as compensation
+for the missing tokens.
+
 The program acts as a non-custodial escrow. It:
 
 1. Takes the holder's A tokens and locks them in a program-owned
