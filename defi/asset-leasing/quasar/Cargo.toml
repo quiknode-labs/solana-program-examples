@@ -15,7 +15,7 @@ check-cfg = [
 ]
 
 [lib]
-# `cdylib` for the on-chain .so; `lib` so `cargo test` can link the Rust
+# `cdylib` for the onchain .so; `lib` so `cargo test` can link the Rust
 # code as a regular library and exercise handlers against QuasarSvm.
 crate-type = ["cdylib", "lib"]
 

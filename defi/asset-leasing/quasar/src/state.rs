@@ -32,7 +32,7 @@ impl LeaseStatus {
 ///
 /// Field order mirrors the Anchor version; integers are promoted to their
 /// `PodXX` counterparts by the `#[account]` macro so the struct stays
-/// alignment-1 and the on-chain bytes match Anchor's little-endian layout
+/// alignment-1 and the onchain bytes match Anchor's little-endian layout
 /// (after the one-byte Quasar discriminator replaces Anchor's 8-byte
 /// sha256 prefix).
 #[account(discriminator = 1)]

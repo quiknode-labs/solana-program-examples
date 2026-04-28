@@ -1,6 +1,6 @@
 # Asset Leasing
 
-**On-chain securities lending.** Long holders rent out fungible token
+**Onchain securities lending.** Long holders rent out fungible token
 inventory to short sellers. Borrowers post collateral, pay a
 second-by-second lending fee, and return equivalent tokens before
 expiry. If the borrowed asset rallies past the maintenance margin,
@@ -9,15 +9,15 @@ returns equivalent tokens cheaply.
 
 This is the same primitive that underpins traditional securities
 lending: long inventory holders (exchange-traded funds and pension
-funds in traditional finance; passive holders on-chain) earn yield on
+funds in traditional finance; passive holders onchain) earn yield on
 assets they would hold anyway, and short sellers and arbitrageurs get
 the borrow they need. The program is written in Anchor; a parallel
-[Quasar port](#7-quasar-port) implements the same on-chain behaviour.
+[Quasar port](#7-quasar-port) implements the same onchain behaviour.
 
 The code uses `lessor` / `lessee` identifiers throughout — those names
 predate the framing change and stay as-is so the source is grep-able.
 The README freely uses **lender** for the lessor and **borrower** (or
-**short seller**) for the lessee; they refer to the same on-chain
+**short seller**) for the lessee; they refer to the same onchain
 roles.
 
 Every instruction handler is walked through with the exact token
@@ -155,14 +155,14 @@ sells them on Jupiter for ~18 000 USDC at the spot price.
   accrued lease fee. The remaining ~22 000 USDC (minus fees paid)
   refunds to Bob.
 - Bob's profit ≈ `$18 000 − $16 000 − fees − trading costs ≈ $2 000`
-  minus carry. This is a 30-day short on NVIDIA, expressed on-chain.
+  minus carry. This is a 30-day short on NVIDIA, expressed onchain.
 
 The asymmetry: liquidation only ever fires when the *borrowed* asset
 rallies against the collateral. A drop in the borrowed asset price is
 purely beneficial to the borrower. The streaming lending fee is the
 position's only ongoing cost in either direction.
 
-§4 walks the on-chain token flows for each path with abstract numbers
+§4 walks the onchain token flows for each path with abstract numbers
 that match the LiteSVM tests; the example above is the same machinery
 applied to a real asset pair.
 
@@ -1100,7 +1100,7 @@ size, or simply want fewer layers between your code and the runtime.
 
 The port implements the same seven instruction handlers, the same
 `Lease` state account, the same program-derived address seed conventions, and produces the
-same on-chain behaviour for every happy-path and adversarial test in
+same onchain behaviour for every happy-path and adversarial test in
 this README.
 
 ### Building and testing

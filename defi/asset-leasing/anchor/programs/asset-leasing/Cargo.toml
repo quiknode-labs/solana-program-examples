@@ -33,7 +33,7 @@ anchor-spl = "1.0.0"
 # oracles/pyth/anchor example is flagged "not building" for the same reason).
 # Instead we parse the fixed layout of the Pyth Receiver `PriceUpdateV2`
 # account by hand in `instructions/liquidate.rs`, matching the published
-# on-chain schema.
+# onchain schema.
 
 [dev-dependencies]
 # Match the test stack used by tokens/escrow and tokens/token-fundraiser so

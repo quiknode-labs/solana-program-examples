@@ -23,6 +23,6 @@ pub const MAX_MAINTENANCE_MARGIN_BASIS_POINTS: u16 = 50_000;
 pub const MAX_LIQUIDATION_BOUNTY_BASIS_POINTS: u16 = 2_000;
 
 /// A Pyth price update is considered stale if its `publish_time` is older
-/// than this many seconds versus the current on-chain clock. 60 s matches the
+/// than this many seconds versus the current onchain clock. 60 s matches the
 /// default staleness window used in the Pyth SDK docs.
 pub const PYTH_MAX_AGE_SECONDS: u64 = 60;

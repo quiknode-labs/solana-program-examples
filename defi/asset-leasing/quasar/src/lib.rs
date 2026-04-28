@@ -12,7 +12,7 @@ use instructions::*;
 mod tests;
 
 // Same program id as the Anchor version so off-chain tooling that derives
-// program-derived addresses or looks up the program on-chain works against both binaries
+// program-derived addresses or looks up the program onchain works against both binaries
 // interchangeably.
 declare_id!("Lease11111111111111111111111111111111111111");
 

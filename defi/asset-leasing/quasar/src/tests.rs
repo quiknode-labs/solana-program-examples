@@ -595,7 +595,7 @@ fn close_expired_call(scenario: &Scenario) -> (Instruction, Vec<Account>) {
 
 /// After a successful `create_lease`, install the resulting vault + lease
 /// state in the SVM database so the next handler call has something to
-/// read from. Copies the authentic on-chain bytes (discriminator, token
+/// read from. Copies the authentic onchain bytes (discriminator, token
 /// amounts, lease fields) straight out of the previous execution result.
 fn commit_state<'a>(
     svm: &mut QuasarSvm,
