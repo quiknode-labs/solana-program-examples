@@ -41,10 +41,26 @@ walks happen.
 
 A **holder** offers some quantity of a token — mint **A**, the
 "leased mint" — for a fixed term. A **short seller** posts collateral
-in a different mint **B** — the "collateral mint" — to take delivery.
-The short seller will typically sell the A tokens immediately on a
-market like Jupiter, then re-acquire equivalent A tokens later to
-close out.
+in a different mint **B** — the "collateral mint" — to take delivery
+of the A tokens.
+
+The short seller's full lifecycle is:
+
+1. **Open the position.** Borrow A from the holder by posting B as
+   collateral. Pay a per-second lending fee out of the collateral.
+2. **Sell A immediately** on a market like Jupiter, receiving more B
+   in return. The short seller now has more B and owes A.
+3. **Wait.** They are betting A's price (denominated in B) will fall.
+4. **Close the position.** Buy A back on the open market — hopefully
+   at a lower price than they sold it for — and return the same
+   quantity of A to the holder. The B they paid to re-acquire A is
+   less than the B they got for selling it, and the difference is
+   the short seller's profit.
+
+If A's price *rises* instead, buying it back costs more B than they
+got for selling it — that's a loss. If it rises far enough that their
+locked collateral is no longer worth more than the A they owe, they
+get liquidated (see below).
 
 The program acts as a non-custodial escrow. It:
 
