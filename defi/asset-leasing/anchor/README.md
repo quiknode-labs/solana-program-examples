@@ -42,21 +42,28 @@ of the A tokens.
 
 The short seller's full lifecycle is:
 
-1. **Open the position.** Borrow A from the holder by posting B as
-   collateral. Pay a per-second lending fee out of the collateral.
+1. **Open the position** by calling `take_lease`. This borrows A from
+   the holder and locks B as collateral. A per-second lending fee
+   accrues from this point onward, settled by `pay_lease_fee`.
 2. **Sell A immediately** on a market like Jupiter, receiving more B
    in return. The short seller now has more B and owes A.
 3. **Wait.** They are betting A's price (denominated in B) will fall.
-4. **Close the position.** Buy A back on the open market — hopefully
-   at a lower price than they sold it for — and return the same
-   quantity of A to the holder. The B they paid to re-acquire A is
-   less than the B they got for selling it, and the difference is
-   the short seller's profit.
+   While waiting, they may call `top_up_collateral` to defend the
+   position if A's price moves against them, and `pay_lease_fee` to
+   settle accrued fees.
+4. **Close the position** by calling `return_lease`. They buy A back
+   on the open market — hopefully at a lower price than they sold it
+   for — and return the same quantity of A to the holder. The B they
+   paid to re-acquire A is less than the B they got for selling it,
+   and the difference is the short seller's profit.
 
 If A's price *rises* instead, buying it back costs more B than they
 got for selling it — that's a loss. If it rises far enough that their
-locked collateral is no longer worth more than the A they owe, they
-get liquidated (see below).
+locked collateral is no longer worth more than the A they owe, anyone
+can call `liquidate` to close the position out, paying the keeper a
+bounty from the collateral. If the lease term ends without the short
+seller calling `return_lease`, the holder calls `close_expired` to
+seize the collateral and recover.
 
 The program acts as a non-custodial escrow. It:
 
