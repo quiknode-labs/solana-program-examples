@@ -1,12 +1,14 @@
 # Asset Leasing
 
 **Directional token lending.** **Holders** rent out token inventory
-to **short sellers**. Short sellers post collateral, pay a
-second-by-second lending fee, and return equivalent tokens before
-expiry. If the asset's price rallies far enough that the short
-seller's collateral falls below the maintenance margin, keepers
-liquidate the position; if the asset's price falls, the short seller
-profits and returns equivalent tokens cheaply.
+to **short sellers**. The short seller posts collateral, takes
+delivery of the borrowed tokens, and immediately sells them on the
+open market. They pay a second-by-second lending fee while the
+position is open, then buy equivalent tokens back later and return
+them to the holder. If the price falls between the sell and the
+re-buy, the short seller profits on the difference; if the price
+rallies far enough that their collateral falls below the maintenance
+margin, keepers liquidate the position.
 
 This is the same primitive that underpins traditional securities
 lending in TradFi: holders earn yield on inventory they would hold
