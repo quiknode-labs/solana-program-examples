@@ -99,19 +99,6 @@ below and the position becomes liquidatable.
 The program is a pair of vaults, a small piece of state that tracks
 how much has been paid, and an oracle check.
 
-### Roles
-
-- **Holder.** Long the asset, willing to part with the asset
-  temporarily to earn the lending fee. The economic match for this
-  role is a passive allocator - someone who would hold the asset
-  anyway and is happy to earn yield on idle inventory.
-- **Short seller.** Pays the lending fee for the right to sell the
-  borrowed tokens now and buy them back later. The payoff shape is
-  the same as a short: profit if the borrowed asset falls, loss (and
-  possible liquidation) if the asset rises.
-- **Keeper / liquidator.** Standard role - watches for
-  undercollateralised positions and takes the bounty for closing them.
-
 ### Example: shorting xNVDA via the lending market
 
 Concrete numbers using assets that already trade on Solana -
