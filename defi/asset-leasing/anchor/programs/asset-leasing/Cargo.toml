@@ -21,7 +21,7 @@ custom-panic = []
 
 [dependencies]
 # `init-if-needed` is required because several instructions lazily create the
-# counterparty's associated token accounts (keeper's collateral associated token account on first liquidation, lessor's
+# counterparty's associated token accounts (keeper's collateral associated token account on first liquidation, holder's
 # leased associated token account on first return, etc.). Anchor forces an opt-in to make us
 # re-affirm that we verify ownership on every touch — which we do via the
 # `associated_token::authority = ...` constraints.

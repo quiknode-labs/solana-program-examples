@@ -17,30 +17,30 @@ use crate::{
 #[derive(Accounts)]
 pub struct ReturnLease<'info> {
     #[account(mut)]
-    pub lessee: Signer<'info>,
+    pub short_seller: Signer<'info>,
 
     /// CHECK: Reference only — receives the lease fee + closed-vault rent-exempt-lamport refund.
     #[account(mut)]
-    pub lessor: UncheckedAccount<'info>,
+    pub holder: UncheckedAccount<'info>,
 
     #[account(
         mut,
-        seeds = [LEASE_SEED, lessor.key().as_ref(), &lease.lease_id.to_le_bytes()],
+        seeds = [LEASE_SEED, holder.key().as_ref(), &lease.lease_id.to_le_bytes()],
         bump = lease.bump,
-        has_one = lessor,
+        has_one = holder,
         has_one = leased_mint,
         has_one = collateral_mint,
-        constraint = lease.lessee == lessee.key() @ AssetLeasingError::Unauthorised,
+        constraint = lease.short_seller == short_seller.key() @ AssetLeasingError::Unauthorised,
         constraint = lease.status == LeaseStatus::Active @ AssetLeasingError::InvalidLeaseStatus,
-        close = lessor,
+        close = holder,
     )]
     pub lease: Account<'info, Lease>,
 
     pub leased_mint: Box<InterfaceAccount<'info, Mint>>,
     pub collateral_mint: Box<InterfaceAccount<'info, Mint>>,
 
-    /// Leased tokens flow back into this vault from the lessee, then out to
-    /// the lessor in the same instruction. Closed at the end to reclaim rent-exempt lamports.
+    /// Leased tokens flow back into this vault from the short_seller, then out to
+    /// the holder in the same instruction. Closed at the end to reclaim rent-exempt lamports.
     #[account(
         mut,
         seeds = [LEASED_VAULT_SEED, lease.key().as_ref()],
@@ -64,38 +64,38 @@ pub struct ReturnLease<'info> {
     #[account(
         mut,
         associated_token::mint = leased_mint,
-        associated_token::authority = lessee,
+        associated_token::authority = short_seller,
         associated_token::token_program = token_program,
     )]
-    pub lessee_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub short_seller_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         mut,
         associated_token::mint = collateral_mint,
-        associated_token::authority = lessee,
+        associated_token::authority = short_seller,
         associated_token::token_program = token_program,
     )]
-    pub lessee_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub short_seller_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Lessor's leased-mint associated token account, created on demand. They may have sent the
+    /// Holder's leased-mint associated token account, created on demand. They may have sent the
     /// original tokens from a different account.
     #[account(
         init_if_needed,
-        payer = lessee,
+        payer = short_seller,
         associated_token::mint = leased_mint,
-        associated_token::authority = lessor,
+        associated_token::authority = holder,
         associated_token::token_program = token_program,
     )]
-    pub lessor_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub holder_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
-        payer = lessee,
+        payer = short_seller,
         associated_token::mint = collateral_mint,
-        associated_token::authority = lessor,
+        associated_token::authority = holder,
         associated_token::token_program = token_program,
     )]
-    pub lessor_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub holder_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -106,18 +106,18 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let lease_key = context.accounts.lease.key();
 
-    // 1. Lessee returns leased tokens to the leased vault (full amount).
+    // 1. ShortSeller returns leased tokens to the leased vault (full amount).
     let leased_amount = context.accounts.lease.leased_amount;
     transfer_tokens_from_user(
-        &context.accounts.lessee_leased_account,
+        &context.accounts.short_seller_leased_account,
         &context.accounts.leased_vault,
         leased_amount,
         &context.accounts.leased_mint,
-        &context.accounts.lessee,
+        &context.accounts.short_seller,
         &context.accounts.token_program,
     )?;
 
-    // 2. Forward leased tokens from the vault to the lessor.
+    // 2. Forward leased tokens from the vault to the holder.
     let leased_vault_bump = context.accounts.lease.leased_vault_bump;
     let leased_vault_seeds: &[&[u8]] = &[
         LEASED_VAULT_SEED,
@@ -126,7 +126,7 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
     ];
     transfer_tokens_from_vault(
         &context.accounts.leased_vault,
-        &context.accounts.lessor_leased_account,
+        &context.accounts.holder_leased_account,
         leased_amount,
         &context.accounts.leased_mint,
         &context.accounts.leased_vault.to_account_info(),
@@ -134,7 +134,7 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
         &[leased_vault_seeds],
     )?;
 
-    // 3. Settle accrued lease fees: collateral vault -> lessor.
+    // 3. Settle accrued lease fees: collateral vault -> holder.
     let lease_fee_due = compute_lease_fee_due(&context.accounts.lease, now)?;
     let lease_fee_payable = lease_fee_due.min(context.accounts.lease.collateral_amount);
 
@@ -148,7 +148,7 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
     if lease_fee_payable > 0 {
         transfer_tokens_from_vault(
             &context.accounts.collateral_vault,
-            &context.accounts.lessor_collateral_account,
+            &context.accounts.holder_collateral_account,
             lease_fee_payable,
             &context.accounts.collateral_mint,
             &context.accounts.collateral_vault.to_account_info(),
@@ -157,8 +157,8 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
         )?;
     }
 
-    // 4. Refund remaining collateral to the lessee. Returning early does not
-    // entitle the lessee to a future-lease-fee refund — Lease fees only accrue for time
+    // 4. Refund remaining collateral to the short_seller. Returning early does not
+    // entitle the short_seller to a future-lease-fee refund — Lease fees only accrue for time
     // actually used, so `compute_lease_fee_due` already excludes the unused tail.
     let collateral_after_lease_fees = context
         .accounts
@@ -170,7 +170,7 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
     if collateral_after_lease_fees > 0 {
         transfer_tokens_from_vault(
             &context.accounts.collateral_vault,
-            &context.accounts.lessee_collateral_account,
+            &context.accounts.short_seller_collateral_account,
             collateral_after_lease_fees,
             &context.accounts.collateral_mint,
             &context.accounts.collateral_vault.to_account_info(),
@@ -180,16 +180,16 @@ pub fn handle_return_lease(context: Context<ReturnLease>) -> Result<()> {
     }
 
     // 5. Close both vaults so the rent-exempt lamports come back to the
-    // lessor — the lessee only pays for the temporary state they held.
+    // holder — the short_seller only pays for the temporary state they held.
     close_vault(
         &context.accounts.leased_vault,
-        &context.accounts.lessor.to_account_info(),
+        &context.accounts.holder.to_account_info(),
         &context.accounts.token_program,
         &[leased_vault_seeds],
     )?;
     close_vault(
         &context.accounts.collateral_vault,
-        &context.accounts.lessor.to_account_info(),
+        &context.accounts.holder.to_account_info(),
         &context.accounts.token_program,
         &[collateral_vault_seeds],
     )?;

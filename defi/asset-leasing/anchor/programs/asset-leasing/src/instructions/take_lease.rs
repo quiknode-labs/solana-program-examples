@@ -14,16 +14,16 @@ use crate::{
 #[derive(Accounts)]
 pub struct TakeLease<'info> {
     #[account(mut)]
-    pub lessee: Signer<'info>,
+    pub short_seller: Signer<'info>,
 
     /// CHECK: Only used as a reference for the program-derived address seeds; no data accessed.
-    pub lessor: UncheckedAccount<'info>,
+    pub holder: UncheckedAccount<'info>,
 
     #[account(
         mut,
-        seeds = [LEASE_SEED, lessor.key().as_ref(), &lease.lease_id.to_le_bytes()],
+        seeds = [LEASE_SEED, holder.key().as_ref(), &lease.lease_id.to_le_bytes()],
         bump = lease.bump,
-        has_one = lessor,
+        has_one = holder,
         has_one = leased_mint,
         has_one = collateral_mint,
         constraint = lease.status == LeaseStatus::Listed @ AssetLeasingError::InvalidLeaseStatus,
@@ -53,26 +53,26 @@ pub struct TakeLease<'info> {
     )]
     pub collateral_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Lessee's existing collateral account — they must already hold the
+    /// ShortSeller's existing collateral account — they must already hold the
     /// required collateral before calling.
     #[account(
         mut,
         associated_token::mint = collateral_mint,
-        associated_token::authority = lessee,
+        associated_token::authority = short_seller,
         associated_token::token_program = token_program,
     )]
-    pub lessee_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub short_seller_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Lessee's associated token account for the leased mint. Created on-demand if missing so the
-    /// UI only has to hand over a lessee keypair plus the two mints.
+    /// ShortSeller's associated token account for the leased mint. Created on-demand if missing so the
+    /// UI only has to hand over a short_seller keypair plus the two mints.
     #[account(
         init_if_needed,
-        payer = lessee,
+        payer = short_seller,
         associated_token::mint = leased_mint,
-        associated_token::authority = lessee,
+        associated_token::authority = short_seller,
         associated_token::token_program = token_program,
     )]
-    pub lessee_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub short_seller_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -87,14 +87,14 @@ pub fn handle_take_lease(context: Context<TakeLease>) -> Result<()> {
     let leased_amount = context.accounts.lease.leased_amount;
     let duration_seconds = context.accounts.lease.duration_seconds;
 
-    // Lessee deposits collateral first so a failed leased-token transfer
+    // ShortSeller deposits collateral first so a failed leased-token transfer
     // rolls back their deposit atomically.
     transfer_tokens_from_user(
-        &context.accounts.lessee_collateral_account,
+        &context.accounts.short_seller_collateral_account,
         &context.accounts.collateral_vault,
         required_collateral_amount,
         &context.accounts.collateral_mint,
-        &context.accounts.lessee,
+        &context.accounts.short_seller,
         &context.accounts.token_program,
     )?;
 
@@ -110,7 +110,7 @@ pub fn handle_take_lease(context: Context<TakeLease>) -> Result<()> {
 
     transfer_tokens_from_vault(
         &context.accounts.leased_vault,
-        &context.accounts.lessee_leased_account,
+        &context.accounts.short_seller_leased_account,
         leased_amount,
         &context.accounts.leased_mint,
         &context.accounts.leased_vault.to_account_info(),
@@ -123,7 +123,7 @@ pub fn handle_take_lease(context: Context<TakeLease>) -> Result<()> {
         .ok_or(AssetLeasingError::MathOverflow)?;
 
     let lease = &mut context.accounts.lease;
-    lease.lessee = context.accounts.lessee.key();
+    lease.short_seller = context.accounts.short_seller.key();
     lease.collateral_amount = required_collateral_amount;
     lease.start_timestamp = now;
     lease.end_timestamp = end_timestamp;

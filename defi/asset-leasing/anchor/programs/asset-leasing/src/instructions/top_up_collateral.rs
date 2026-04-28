@@ -11,18 +11,18 @@ use crate::{
 #[derive(Accounts)]
 pub struct TopUpCollateral<'info> {
     #[account(mut)]
-    pub lessee: Signer<'info>,
+    pub short_seller: Signer<'info>,
 
     /// CHECK: program-derived address seed reference; no reads.
-    pub lessor: UncheckedAccount<'info>,
+    pub holder: UncheckedAccount<'info>,
 
     #[account(
         mut,
-        seeds = [LEASE_SEED, lessor.key().as_ref(), &lease.lease_id.to_le_bytes()],
+        seeds = [LEASE_SEED, holder.key().as_ref(), &lease.lease_id.to_le_bytes()],
         bump = lease.bump,
-        has_one = lessor,
+        has_one = holder,
         has_one = collateral_mint,
-        constraint = lease.lessee == lessee.key() @ AssetLeasingError::Unauthorised,
+        constraint = lease.short_seller == short_seller.key() @ AssetLeasingError::Unauthorised,
         constraint = lease.status == LeaseStatus::Active @ AssetLeasingError::InvalidLeaseStatus,
     )]
     pub lease: Account<'info, Lease>,
@@ -42,10 +42,10 @@ pub struct TopUpCollateral<'info> {
     #[account(
         mut,
         associated_token::mint = collateral_mint,
-        associated_token::authority = lessee,
+        associated_token::authority = short_seller,
         associated_token::token_program = token_program,
     )]
-    pub lessee_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub short_seller_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
 }
@@ -54,11 +54,11 @@ pub fn handle_top_up_collateral(context: Context<TopUpCollateral>, amount: u64) 
     require!(amount > 0, AssetLeasingError::InvalidCollateralAmount);
 
     transfer_tokens_from_user(
-        &context.accounts.lessee_collateral_account,
+        &context.accounts.short_seller_collateral_account,
         &context.accounts.collateral_vault,
         amount,
         &context.accounts.collateral_mint,
-        &context.accounts.lessee,
+        &context.accounts.short_seller,
         &context.accounts.token_program,
     )?;
 

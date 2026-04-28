@@ -14,27 +14,27 @@ use crate::{
     state::{Lease, LeaseStatus},
 };
 
-/// Lessor-only recovery path. Two real-world situations collapse here:
+/// Holder-only recovery path. Two real-world situations collapse here:
 ///
-/// - The lease sat in `Listed` and the lessor wants to cancel it, recovering
+/// - The lease sat in `Listed` and the holder wants to cancel it, recovering
 ///   the leased tokens they pre-funded. Allowed any time.
-/// - The lease was `Active` but the lessee ghosted past `end_timestamp`. The lessor
+/// - The lease was `Active` but the short_seller ghosted past `end_timestamp`. The holder
 ///   takes the collateral as compensation and closes the books.
 #[derive(Accounts)]
 pub struct CloseExpired<'info> {
     #[account(mut)]
-    pub lessor: Signer<'info>,
+    pub holder: Signer<'info>,
 
     #[account(
         mut,
-        seeds = [LEASE_SEED, lessor.key().as_ref(), &lease.lease_id.to_le_bytes()],
+        seeds = [LEASE_SEED, holder.key().as_ref(), &lease.lease_id.to_le_bytes()],
         bump = lease.bump,
-        has_one = lessor,
+        has_one = holder,
         has_one = leased_mint,
         has_one = collateral_mint,
         constraint = matches!(lease.status, LeaseStatus::Listed | LeaseStatus::Active)
             @ AssetLeasingError::InvalidLeaseStatus,
-        close = lessor,
+        close = holder,
     )]
     pub lease: Account<'info, Lease>,
 
@@ -63,21 +63,21 @@ pub struct CloseExpired<'info> {
 
     #[account(
         init_if_needed,
-        payer = lessor,
+        payer = holder,
         associated_token::mint = leased_mint,
-        associated_token::authority = lessor,
+        associated_token::authority = holder,
         associated_token::token_program = token_program,
     )]
-    pub lessor_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub holder_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
-        payer = lessor,
+        payer = holder,
         associated_token::mint = collateral_mint,
-        associated_token::authority = lessor,
+        associated_token::authority = holder,
         associated_token::token_program = token_program,
     )]
-    pub lessor_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub holder_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -111,14 +111,14 @@ pub fn handle_close_expired(context: Context<CloseExpired>) -> Result<()> {
         core::slice::from_ref(&collateral_vault_bump),
     ];
 
-    // Drain whatever is in the leased vault back to the lessor. For a Listed
+    // Drain whatever is in the leased vault back to the holder. For a Listed
     // lease this is the full leased_amount; for a defaulted Active lease the
-    // vault is empty (the lessee never returned) and this is a no-op.
+    // vault is empty (the short_seller never returned) and this is a no-op.
     let leased_vault_balance = context.accounts.leased_vault.amount;
     if leased_vault_balance > 0 {
         transfer_tokens_from_vault(
             &context.accounts.leased_vault,
-            &context.accounts.lessor_leased_account,
+            &context.accounts.holder_leased_account,
             leased_vault_balance,
             &context.accounts.leased_mint,
             &context.accounts.leased_vault.to_account_info(),
@@ -127,13 +127,13 @@ pub fn handle_close_expired(context: Context<CloseExpired>) -> Result<()> {
         )?;
     }
 
-    // Drain the collateral vault to the lessor. For a Listed lease this is 0.
-    // For a defaulted Active lease this is the lessee's forfeited collateral.
+    // Drain the collateral vault to the holder. For a Listed lease this is 0.
+    // For a defaulted Active lease this is the short_seller's forfeited collateral.
     let collateral_vault_balance = context.accounts.collateral_vault.amount;
     if collateral_vault_balance > 0 {
         transfer_tokens_from_vault(
             &context.accounts.collateral_vault,
-            &context.accounts.lessor_collateral_account,
+            &context.accounts.holder_collateral_account,
             collateral_vault_balance,
             &context.accounts.collateral_mint,
             &context.accounts.collateral_vault.to_account_info(),
@@ -144,26 +144,26 @@ pub fn handle_close_expired(context: Context<CloseExpired>) -> Result<()> {
 
     close_vault(
         &context.accounts.leased_vault,
-        &context.accounts.lessor.to_account_info(),
+        &context.accounts.holder.to_account_info(),
         &context.accounts.token_program,
         &[leased_vault_seeds],
     )?;
     close_vault(
         &context.accounts.collateral_vault,
-        &context.accounts.lessor.to_account_info(),
+        &context.accounts.holder.to_account_info(),
         &context.accounts.token_program,
         &[collateral_vault_seeds],
     )?;
 
     // Settle lease-fee accounting on the default path.
     //
-    // We are not forwarding any accrued lease fees to the lessor here — on default
-    // the lessor takes the whole collateral vault as compensation — but we
+    // We are not forwarding any accrued lease fees to the holder here — on default
+    // the holder takes the whole collateral vault as compensation — but we
     // still bump \`last_paid_timestamp\` so the invariant
     // \`last_paid_timestamp <= now.min(end_timestamp)\` stays intact. That matters for
     // any future version of the program that wants to split the collateral
     // differently (pro-rata lease fees, partial refund on default, haircut to the
-    // lessee for unused time): such a version can read
+    // short_seller for unused time): such a version can read
     // \`last_paid_timestamp\` and trust that everything up to \`now\` is already
     // settled, rather than having to reason about whether this branch ever
     // bumped the timestamp.

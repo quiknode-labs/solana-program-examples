@@ -15,7 +15,7 @@ use crate::{
 #[instruction(lease_id: u64)]
 pub struct CreateLease<'info> {
     #[account(mut)]
-    pub lessor: Signer<'info>,
+    pub holder: Signer<'info>,
 
     #[account(mint::token_program = token_program)]
     pub leased_mint: InterfaceAccount<'info, Mint>,
@@ -26,16 +26,16 @@ pub struct CreateLease<'info> {
     #[account(
         mut,
         associated_token::mint = leased_mint,
-        associated_token::authority = lessor,
+        associated_token::authority = holder,
         associated_token::token_program = token_program,
     )]
-    pub lessor_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub holder_leased_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init,
-        payer = lessor,
+        payer = holder,
         space = Lease::DISCRIMINATOR.len() + Lease::INIT_SPACE,
-        seeds = [LEASE_SEED, lessor.key().as_ref(), &lease_id.to_le_bytes()],
+        seeds = [LEASE_SEED, holder.key().as_ref(), &lease_id.to_le_bytes()],
         bump,
     )]
     pub lease: Account<'info, Lease>,
@@ -45,7 +45,7 @@ pub struct CreateLease<'info> {
     /// returns / liquidation; any handler just signs with the vault seeds.
     #[account(
         init,
-        payer = lessor,
+        payer = holder,
         seeds = [LEASED_VAULT_SEED, lease.key().as_ref()],
         bump,
         token::mint = leased_mint,
@@ -56,7 +56,7 @@ pub struct CreateLease<'info> {
 
     #[account(
         init,
-        payer = lessor,
+        payer = holder,
         seeds = [COLLATERAL_VAULT_SEED, lease.key().as_ref()],
         bump,
         token::mint = collateral_mint,
@@ -84,7 +84,7 @@ pub fn handle_create_lease(
     // Reject leased_mint == collateral_mint. Allowing both to be the same
     // mint would collapse the two vaults' seed derivations into one shared
     // token-balance pool, making lease-fee-vs-collateral accounting ambiguous and
-    // enabling griefing paths where the lessee's "collateral" is the same
+    // enabling griefing paths where the short_seller's "collateral" is the same
     // asset they already hold as the lease principal.
     require!(
         context.accounts.leased_mint.key() != context.accounts.collateral_mint.key(),
@@ -108,23 +108,23 @@ pub fn handle_create_lease(
     );
 
     // Lock the leased tokens into the program-owned vault up-front. Doing this
-    // here (not on take_lease) guarantees a lessee can never accept a lease
-    // the lessor no longer has the funds to deliver.
+    // here (not on take_lease) guarantees a short_seller can never accept a lease
+    // the holder no longer has the funds to deliver.
     transfer_tokens_from_user(
-        &context.accounts.lessor_leased_account,
+        &context.accounts.holder_leased_account,
         &context.accounts.leased_vault,
         leased_amount,
         &context.accounts.leased_mint,
-        &context.accounts.lessor,
+        &context.accounts.holder,
         &context.accounts.token_program,
     )?;
 
     let lease = &mut context.accounts.lease;
     lease.set_inner(Lease {
         lease_id,
-        lessor: context.accounts.lessor.key(),
-        // No lessee yet — will be populated by take_lease.
-        lessee: Pubkey::default(),
+        holder: context.accounts.holder.key(),
+        // No short_seller yet — will be populated by take_lease.
+        short_seller: Pubkey::default(),
         leased_mint: context.accounts.leased_mint.key(),
         leased_amount,
         collateral_mint: context.accounts.collateral_mint.key(),

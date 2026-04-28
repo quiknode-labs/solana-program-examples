@@ -15,8 +15,8 @@ declare_id!("HHKEhLk6dyzG4mK1isPyZiHcEMW4J1CRKryzyQ3JFtnF");
 pub mod asset_leasing {
     use super::*;
 
-    /// Lessor lists a lease: deposits leased tokens into the leased vault and
-    /// publishes the rental terms. The lease sits in `Listed` until a lessee
+    /// Holder lists a lease: deposits leased tokens into the leased vault and
+    /// publishes the rental terms. The lease sits in `Listed` until a short_seller
     /// takes it.
     pub fn create_lease(
         context: Context<CreateLease>,
@@ -42,38 +42,38 @@ pub mod asset_leasing {
         )
     }
 
-    /// Lessee takes the lease: posts collateral into the collateral vault and
+    /// ShortSeller takes the lease: posts collateral into the collateral vault and
     /// receives the leased tokens. Lease transitions to `Active`.
     pub fn take_lease(context: Context<TakeLease>) -> Result<()> {
         instructions::take_lease::handle_take_lease(context)
     }
 
-    /// Stream the lease fee from the collateral vault to the lessor, up to `end_timestamp`.
+    /// Stream the lease fee from the collateral vault to the holder, up to `end_timestamp`.
     /// Anyone may call this to keep the lease current.
     pub fn pay_lease_fee(context: Context<PayLeaseFee>) -> Result<()> {
         instructions::pay_lease_fee::handle_pay_lease_fee(context)
     }
 
-    /// Lessee adds more collateral to stay above the maintenance margin.
+    /// ShortSeller adds more collateral to stay above the maintenance margin.
     pub fn top_up_collateral(context: Context<TopUpCollateral>, amount: u64) -> Result<()> {
         instructions::top_up_collateral::handle_top_up_collateral(context, amount)
     }
 
-    /// Lessee returns the leased tokens (at or before `end_timestamp`). Accrued lease fees
+    /// ShortSeller returns the leased tokens (at or before `end_timestamp`). Accrued lease fees
     /// is settled and the remaining collateral is refunded.
     pub fn return_lease(context: Context<ReturnLease>) -> Result<()> {
         instructions::return_lease::handle_return_lease(context)
     }
 
     /// Keeper liquidates an undercollateralised lease using a Pyth price
-    /// update. Collateral goes to the lessor, minus the keeper bounty.
+    /// update. Collateral goes to the holder, minus the keeper bounty.
     pub fn liquidate(context: Context<Liquidate>) -> Result<()> {
         instructions::liquidate::handle_liquidate(context)
     }
 
-    /// After `end_timestamp`, if the lessee never returned the tokens, the lessor
+    /// After `end_timestamp`, if the short_seller never returned the tokens, the holder
     /// reclaims the collateral as compensation and closes the lease. Also
-    /// used by the lessor to cancel an unrented (`Listed`) lease.
+    /// used by the holder to cancel an unrented (`Listed`) lease.
     pub fn close_expired(context: Context<CloseExpired>) -> Result<()> {
         instructions::close_expired::handle_close_expired(context)
     }

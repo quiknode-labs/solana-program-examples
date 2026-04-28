@@ -36,17 +36,17 @@ pub struct Liquidate<'info> {
 
     /// CHECK: program-derived address seed + lease-fee / collateral destination.
     #[account(mut)]
-    pub lessor: UncheckedAccount<'info>,
+    pub holder: UncheckedAccount<'info>,
 
     #[account(
         mut,
-        seeds = [LEASE_SEED, lessor.key().as_ref(), &lease.lease_id.to_le_bytes()],
+        seeds = [LEASE_SEED, holder.key().as_ref(), &lease.lease_id.to_le_bytes()],
         bump = lease.bump,
-        has_one = lessor,
+        has_one = holder,
         has_one = leased_mint,
         has_one = collateral_mint,
         constraint = lease.status == LeaseStatus::Active @ AssetLeasingError::InvalidLeaseStatus,
-        close = lessor,
+        close = holder,
     )]
     pub lease: Account<'info, Lease>,
 
@@ -77,10 +77,10 @@ pub struct Liquidate<'info> {
         init_if_needed,
         payer = keeper,
         associated_token::mint = collateral_mint,
-        associated_token::authority = lessor,
+        associated_token::authority = holder,
         associated_token::token_program = token_program,
     )]
-    pub lessor_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub holder_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     #[account(
         init_if_needed,
@@ -160,7 +160,7 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
     drop(price_data);
 
     // Feed pinning: reject any `PriceUpdateV2` whose feed_id does not match
-    // the one the lessor committed to at `create_lease`. Without this guard,
+    // the one the holder committed to at `create_lease`. Without this guard,
     // a keeper could pass in any feed the Pyth Receiver program owns — e.g.
     // a wildly volatile pair that dips enough to flag the position as
     // underwater — and trigger a spurious liquidation.
@@ -174,8 +174,8 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
         AssetLeasingError::PositionHealthy
     );
 
-    // Settle accrued lease fees first (up to end_timestamp) so the lessor is paid for the
-    // time the lessee actually used. Only then slice off bounty + remainder.
+    // Settle accrued lease fees first (up to end_timestamp) so the holder is paid for the
+    // time the short_seller actually used. Only then slice off bounty + remainder.
     let lease_fee_due = compute_lease_fee_due(&context.accounts.lease, now)?;
     let lease_fee_payable = lease_fee_due.min(context.accounts.lease.collateral_amount);
 
@@ -196,7 +196,7 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
     if lease_fee_payable > 0 {
         transfer_tokens_from_vault(
             &context.accounts.collateral_vault,
-            &context.accounts.lessor_collateral_account,
+            &context.accounts.holder_collateral_account,
             lease_fee_payable,
             &context.accounts.collateral_mint,
             &context.accounts.collateral_vault.to_account_info(),
@@ -232,14 +232,14 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
         )?;
     }
 
-    let lessor_share = remaining
+    let holder_share = remaining
         .checked_sub(bounty)
         .ok_or(AssetLeasingError::MathOverflow)?;
-    if lessor_share > 0 {
+    if holder_share > 0 {
         transfer_tokens_from_vault(
             &context.accounts.collateral_vault,
-            &context.accounts.lessor_collateral_account,
-            lessor_share,
+            &context.accounts.holder_collateral_account,
+            holder_share,
             &context.accounts.collateral_mint,
             &context.accounts.collateral_vault.to_account_info(),
             &context.accounts.token_program,
@@ -247,18 +247,18 @@ pub fn handle_liquidate(context: Context<Liquidate>) -> Result<()> {
         )?;
     }
 
-    // The leased vault is empty (lessee kept the tokens on default) but was
-    // rent-exempt funded at creation. Close both vaults so the lessor recoups
+    // The leased vault is empty (short_seller kept the tokens on default) but was
+    // rent-exempt funded at creation. Close both vaults so the holder recoups
     // the rent-exempt lamports.
     close_vault(
         &context.accounts.leased_vault,
-        &context.accounts.lessor.to_account_info(),
+        &context.accounts.holder.to_account_info(),
         &context.accounts.token_program,
         &[leased_vault_seeds],
     )?;
     close_vault(
         &context.accounts.collateral_vault,
-        &context.accounts.lessor.to_account_info(),
+        &context.accounts.holder.to_account_info(),
         &context.accounts.token_program,
         &[collateral_vault_seeds],
     )?;
@@ -286,7 +286,7 @@ pub fn is_underwater(lease: &Lease, price: &DecodedPriceUpdate, now: i64) -> Res
     let leased_amount = lease.leased_amount as u128;
     let collateral_amount = lease.collateral_amount as u128;
     let margin_basis_points = lease.maintenance_margin_basis_points as u128;
-    let denom = BASIS_POINTS_DENOMINATOR as u128;
+    let denominator = BASIS_POINTS_DENOMINATOR as u128;
 
     let (collateral_scaled, debt_scaled) = if price.exponent >= 0 {
         let scale = ten_pow(price.exponent as u32)?;
@@ -307,7 +307,7 @@ pub fn is_underwater(lease: &Lease, price: &DecodedPriceUpdate, now: i64) -> Res
     };
 
     let lhs = collateral_scaled
-        .checked_mul(denom)
+        .checked_mul(denominator)
         .ok_or(AssetLeasingError::MathOverflow)?;
     let rhs = debt_scaled
         .checked_mul(margin_basis_points)

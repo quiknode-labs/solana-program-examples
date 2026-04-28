@@ -13,20 +13,20 @@ use crate::{
 
 #[derive(Accounts)]
 pub struct PayLeaseFee<'info> {
-    /// Anyone may settle the lease fee — the lessee has every incentive to keep the
+    /// Anyone may settle the lease fee — the short_seller has every incentive to keep the
     /// lease current, but a keeper bot could also push a lease fee payment before a
     /// liquidation check so healthy leases stay healthy.
     #[account(mut)]
     pub payer: Signer<'info>,
 
     /// CHECK: Referenced only for program-derived address derivation + has_one check on `lease`.
-    pub lessor: UncheckedAccount<'info>,
+    pub holder: UncheckedAccount<'info>,
 
     #[account(
         mut,
-        seeds = [LEASE_SEED, lessor.key().as_ref(), &lease.lease_id.to_le_bytes()],
+        seeds = [LEASE_SEED, holder.key().as_ref(), &lease.lease_id.to_le_bytes()],
         bump = lease.bump,
-        has_one = lessor,
+        has_one = holder,
         has_one = collateral_mint,
         constraint = lease.status == LeaseStatus::Active @ AssetLeasingError::InvalidLeaseStatus,
     )]
@@ -44,16 +44,16 @@ pub struct PayLeaseFee<'info> {
     )]
     pub collateral_vault: Box<InterfaceAccount<'info, TokenAccount>>,
 
-    /// Lessor's collateral-mint associated token account, created on demand so the lessor does not
+    /// Holder's collateral-mint associated token account, created on demand so the holder does not
     /// need to pre-fund it with the lease fee.
     #[account(
         init_if_needed,
         payer = payer,
         associated_token::mint = collateral_mint,
-        associated_token::authority = lessor,
+        associated_token::authority = holder,
         associated_token::token_program = token_program,
     )]
-    pub lessor_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub holder_collateral_account: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub token_program: Interface<'info, TokenInterface>,
     pub associated_token_program: Program<'info, AssociatedToken>,
@@ -72,7 +72,7 @@ pub fn handle_pay_lease_fee(context: Context<PayLeaseFee>) -> Result<()> {
     }
 
     // Cap lease fees at whatever collateral actually sits in the vault. If the
-    // lessee under-collateralised we cannot magically create funds; the
+    // short_seller under-collateralised we cannot magically create funds; the
     // remainder is their debt and can trigger liquidation.
     let payable = lease_fee_amount.min(context.accounts.collateral_amount_available());
 
@@ -88,7 +88,7 @@ pub fn handle_pay_lease_fee(context: Context<PayLeaseFee>) -> Result<()> {
 
         transfer_tokens_from_vault(
             &context.accounts.collateral_vault,
-            &context.accounts.lessor_collateral_account,
+            &context.accounts.holder_collateral_account,
             payable,
             &context.accounts.collateral_mint,
             &context.accounts.collateral_vault.to_account_info(),

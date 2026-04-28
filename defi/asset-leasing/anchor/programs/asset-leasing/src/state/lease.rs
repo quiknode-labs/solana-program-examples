@@ -4,8 +4,8 @@ use anchor_lang::prelude::*;
 ///   Listed      --take_lease-->     Active
 ///   Active      --return_lease-->   Closed
 ///   Active      --liquidate-->      Liquidated
-///   Listed      --close_expired-->  Closed  (lessor cancels unrented lease)
-///   Active      --close_expired-->  Closed  (after end_timestamp, defaulted lessee)
+///   Listed      --close_expired-->  Closed  (holder cancels unrented lease)
+///   Active      --close_expired-->  Closed  (after end_timestamp, defaulted short_seller)
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq, Debug, InitSpace)]
 pub enum LeaseStatus {
     Listed,
@@ -17,29 +17,29 @@ pub enum LeaseStatus {
 #[account]
 #[derive(InitSpace)]
 pub struct Lease {
-    /// Caller-supplied id so one lessor can run many leases in parallel. The
-    /// program-derived address is seeded by (LEASE_SEED, lessor, lease_id).
+    /// Caller-supplied id so one holder can run many leases in parallel. The
+    /// program-derived address is seeded by (LEASE_SEED, holder, lease_id).
     pub lease_id: u64,
     /// Account that listed the lease and receives the lease fee. Always set.
-    pub lessor: Pubkey,
+    pub holder: Pubkey,
     /// Account that took the lease. `Pubkey::default()` while `Listed`.
-    pub lessee: Pubkey,
+    pub short_seller: Pubkey,
 
     /// Mint of the tokens being leased out.
     pub leased_mint: Pubkey,
     /// Amount of leased tokens locked at creation. Used for repayment checks.
     pub leased_amount: u64,
 
-    /// Mint of the collateral posted by the lessee.
+    /// Mint of the collateral posted by the short_seller.
     pub collateral_mint: Pubkey,
-    /// Collateral the lessee posted (increases on top-up). Decreases as the lease fee
+    /// Collateral the short_seller posted (increases on top-up). Decreases as the lease fee
     /// is streamed out of the collateral vault.
     pub collateral_amount: u64,
-    /// Collateral the lessee must deposit up-front when taking the lease.
+    /// Collateral the short_seller must deposit up-front when taking the lease.
     pub required_collateral_amount: u64,
 
     /// Lease fee charged per second, denominated in collateral tokens and paid
-    /// from the collateral vault to the lessor on each `pay_lease_fee`.
+    /// from the collateral vault to the holder on each `pay_lease_fee`.
     pub lease_fee_per_second: u64,
     /// Length of the lease, in seconds. Set at creation, used to compute
     /// `end_timestamp` when the lease activates.
@@ -62,7 +62,7 @@ pub struct Lease {
     /// liquidation handler refuses price updates whose on-account `feed_id`
     /// does not match this value, so a keeper cannot swap in an unrelated
     /// feed (e.g. a cheaper or more volatile pair) to force a liquidation.
-    /// Chosen by the lessor at `create_lease`.
+    /// Chosen by the holder at `create_lease`.
     pub feed_id: [u8; 32],
 
     /// Current lifecycle state.
