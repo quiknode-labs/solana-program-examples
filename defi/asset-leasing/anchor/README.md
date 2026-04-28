@@ -44,8 +44,7 @@ A **holder** offers some quantity of a token — mint **A**, the
 in a different mint **B** — the "collateral mint" — to take delivery.
 The short seller will typically sell the A tokens immediately on a
 market like Jupiter, then re-acquire equivalent A tokens later to
-close out. The short seller only has to return the same *quantity*
-of A, not the exact units they received.
+close out.
 
 The program acts as a non-custodial escrow. It:
 
