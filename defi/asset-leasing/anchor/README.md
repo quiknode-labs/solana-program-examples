@@ -1,18 +1,18 @@
 # Asset Leasing
 
-**Directional token lending.** **Holders** **rent out** **fungible
-token** inventory to **short sellers**. Short sellers post
-collateral, pay a second-by-second lending fee, and return equivalent
-tokens before expiry. If the asset's price rallies far enough that
-the short seller's collateral falls below the maintenance margin,
-keepers liquidate the position; if the asset's price falls, the
-short seller profits and returns equivalent tokens cheaply.
+**Directional token lending.** **Holders** rent out token inventory
+to **short sellers**. Short sellers post collateral, pay a
+second-by-second lending fee, and return equivalent tokens before
+expiry. If the asset's price rallies far enough that the short
+seller's collateral falls below the maintenance margin, keepers
+liquidate the position; if the asset's price falls, the short seller
+profits and returns equivalent tokens cheaply.
 
 This is the same primitive that underpins traditional securities
 lending in TradFi: holders earn yield on inventory they would hold
 anyway (think exchange-traded funds, pension funds, or any passive
-allocator), and short sellers and arbitrageurs get the borrow they
-need. The program is written in
+allocator), and short sellers and arbitrageurs get the tokens they
+need to sell short. The program is written in
 [Anchor](https://solana.com/docs/terminology); a parallel
 [Quasar port](#7-quasar-port) implements the same onchain behaviour.
 
@@ -39,14 +39,13 @@ walks happen.
 
 ## 1. What does this program do?
 
-A **holder** offers some quantity of one fungible token — mint **A**,
-the "leased mint" — for a fixed term. A **short seller** posts
-collateral in a different mint **B** — the "collateral mint" — to
-take delivery. The short seller will typically sell the A tokens
-immediately on a market like Jupiter, then re-acquire equivalent A
-tokens later to close out. Because mint A is fungible, the short
-seller only has to return the same *quantity*, not the exact units
-they received.
+A **holder** offers some quantity of a token — mint **A**, the
+"leased mint" — for a fixed term. A **short seller** posts collateral
+in a different mint **B** — the "collateral mint" — to take delivery.
+The short seller will typically sell the A tokens immediately on a
+market like Jupiter, then re-acquire equivalent A tokens later to
+close out. The short seller only has to return the same *quantity*
+of A, not the exact units they received.
 
 The program acts as a non-custodial escrow. It:
 
