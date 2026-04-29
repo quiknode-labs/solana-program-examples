@@ -22,6 +22,12 @@ Constant product AMM (x·y=k) — create liquidity pools, deposit and withdraw l
 
 [⚓ Anchor](./tokens/token-swap/anchor) [💫 Quasar](./tokens/token-swap/quasar)
 
+### Asset Leasing
+
+Fixed-term leasing of SPL tokens with SPL collateral, per-second rent, and Pyth-priced liquidation — lessors list tokens, lessees post collateral, keepers liquidate undercollateralised positions.
+
+[⚓ Anchor](./defi/asset-leasing/anchor)
+
 ### Escrow
 
 Peer-to-peer OTC trade — one user deposits token A and specifies how much token B they want. A counterparty fulfils the offer and both sides receive their tokens atomically.
