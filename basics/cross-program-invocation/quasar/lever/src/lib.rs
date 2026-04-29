@@ -22,7 +22,7 @@ mod quasar_lever {
 
     /// Toggle the power switch. Logs who is pulling the lever.
     #[instruction(discriminator = 1)]
-    pub fn switch_power(ctx: Ctx<SwitchPower>, name: String) -> Result<(), ProgramError> {
+    pub fn switch_power(ctx: Ctx<SwitchPower>, name: String<50>) -> Result<(), ProgramError> {
         instructions::handle_switch_power(&mut ctx.accounts, name)
     }
 }

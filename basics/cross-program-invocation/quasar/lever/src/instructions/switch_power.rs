@@ -5,9 +5,9 @@ use {
 
 /// Accounts for toggling the power switch.
 #[derive(Accounts)]
-pub struct SwitchPower<'info> {
+pub struct SwitchPower {
     #[account(mut)]
-    pub power: &'info mut Account<PowerStatus>,
+    pub power: Account<PowerStatus>,
 }
 
 #[inline(always)]
