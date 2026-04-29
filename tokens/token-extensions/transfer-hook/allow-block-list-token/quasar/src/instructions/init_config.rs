@@ -6,16 +6,16 @@ use crate::constants::CONFIG_SEED;
 use crate::state::{write_config, CONFIG_SIZE};
 
 #[derive(Accounts)]
-pub struct InitConfig<'info> {
+pub struct InitConfig {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub config: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub config: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_init_config(accounts: &InitConfig) -> Result<(), ProgramError> {
+pub fn handle_init_config(accounts: &mut InitConfig) -> Result<(), ProgramError> {
     let (config_pda, bump) = Address::find_program_address(&[CONFIG_SEED], &crate::ID);
 
     if accounts.config.to_account_view().address() != &config_pda {
@@ -31,8 +31,8 @@ pub fn handle_init_config(accounts: &InitConfig) -> Result<(), ProgramError> {
 
     accounts.system_program
         .create_account(
-            accounts.payer,
-            &*accounts.config,
+            &accounts.payer,
+            &accounts.config,
             lamports,
             CONFIG_SIZE,
             &crate::ID,
@@ -40,7 +40,7 @@ pub fn handle_init_config(accounts: &InitConfig) -> Result<(), ProgramError> {
         .invoke_signed(&seeds)?;
 
     let view = unsafe {
-        &mut *(accounts.config as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.config as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = view.try_borrow_mut()?;

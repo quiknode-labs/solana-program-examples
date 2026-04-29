@@ -8,10 +8,8 @@ pub struct Game {
 
 const DEFAULT_TICKETS_TO_PLAY: u32 = 3;
 
-impl Game {
-    pub fn name_matches(&self, other: &str) -> bool {
-        self.name.as_bytes() == other.as_bytes()
-    }
+pub fn game_name_matches(game: &Game, other: &str) -> bool {
+    game.name.as_bytes() == other.as_bytes()
 }
 
 /// Static list of carnival games.

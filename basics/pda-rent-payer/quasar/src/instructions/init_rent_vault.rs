@@ -5,17 +5,17 @@ use quasar_lang::prelude::*;
 /// When lamports are sent to a new address, the system program creates
 /// a system-owned account automatically.
 #[derive(Accounts)]
-pub struct InitRentVault<'info> {
+pub struct InitRentVault {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut, seeds = [b"rent_vault"], bump)]
-    pub rent_vault: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub rent_vault: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_init_rent_vault(accounts: &InitRentVault, fund_lamports: u64) -> Result<(), ProgramError> {
+pub fn handle_init_rent_vault(accounts: &mut InitRentVault, fund_lamports: u64) -> Result<(), ProgramError> {
     accounts.system_program
-        .transfer(accounts.payer, accounts.rent_vault, fund_lamports)
+        .transfer(&accounts.payer, &accounts.rent_vault, fund_lamports)
         .invoke()
 }

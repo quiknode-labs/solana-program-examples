@@ -6,34 +6,35 @@ use {
 
 /// Accounts for swapping tokens using the constant-product formula.
 #[derive(Accounts)]
-pub struct SwapExactTokensForTokens<'info> {
+pub struct SwapExactTokensForTokens {
     #[account(seeds = [b"amm"], bump)]
-    pub amm: &'info Account<Amm>,
+    pub amm: Account<Amm>,
     #[account(seeds = [amm, mint_a, mint_b], bump)]
-    pub pool: &'info Account<Pool>,
+    pub pool: Account<Pool>,
     /// Pool authority PDA.
     #[account(seeds = [amm, mint_a, mint_b, crate::AUTHORITY_SEED], bump)]
-    pub pool_authority: &'info UncheckedAccount,
-    pub trader: &'info Signer,
-    pub mint_a: &'info Account<Mint>,
-    pub mint_b: &'info Account<Mint>,
+    pub pool_authority: UncheckedAccount,
+    pub trader: Signer,
+    pub mint_a: Account<Mint>,
+    pub mint_b: Account<Mint>,
     #[account(mut)]
-    pub pool_account_a: &'info mut Account<Token>,
+    pub pool_account_a: Account<Token>,
     #[account(mut)]
-    pub pool_account_b: &'info mut Account<Token>,
+    pub pool_account_b: Account<Token>,
     #[account(mut, init_if_needed, payer = payer, token::mint = mint_a, token::authority = trader)]
-    pub trader_account_a: &'info mut Account<Token>,
+    pub trader_account_a: Account<Token>,
     #[account(mut, init_if_needed, payer = payer, token::mint = mint_b, token::authority = trader)]
-    pub trader_account_b: &'info mut Account<Token>,
+    pub trader_account_b: Account<Token>,
     #[account(mut)]
-    pub payer: &'info Signer,
-    pub token_program: &'info Program<Token>,
-    pub system_program: &'info Program<System>,
+    pub payer: Signer,
+    pub token_program: Program<Token>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
 pub fn handle_swap_exact_tokens_for_tokens(
-    accounts: &mut SwapExactTokensForTokens, swap_a: bool,
+    accounts: &mut SwapExactTokensForTokens,
+    swap_a: bool,
     input_amount: u64,
     min_output_amount: u64,
     bumps: &SwapExactTokensForTokensBumps,
@@ -99,20 +100,20 @@ pub fn handle_swap_exact_tokens_for_tokens(
     if swap_a {
         // Trader sends token A to pool.
         accounts.token_program
-            .transfer(accounts.trader_account_a, accounts.pool_account_a, accounts.trader, input)
+            .transfer(&accounts.trader_account_a, &accounts.pool_account_a, &accounts.trader, input)
             .invoke()?;
         // Pool sends token B to trader (signed).
         accounts.token_program
-            .transfer(accounts.pool_account_b, accounts.trader_account_b, accounts.pool_authority, output)
+            .transfer(&accounts.pool_account_b, &accounts.trader_account_b, &accounts.pool_authority, output)
             .invoke_signed(seeds)?;
     } else {
         // Pool sends token A to trader (signed).
         accounts.token_program
-            .transfer(accounts.pool_account_a, accounts.trader_account_a, accounts.pool_authority, output)
+            .transfer(&accounts.pool_account_a, &accounts.trader_account_a, &accounts.pool_authority, output)
             .invoke_signed(seeds)?;
         // Trader sends token B to pool.
         accounts.token_program
-            .transfer(accounts.trader_account_b, accounts.pool_account_b, accounts.trader, input)
+            .transfer(&accounts.trader_account_b, &accounts.pool_account_b, &accounts.trader, input)
             .invoke()?;
     }
 

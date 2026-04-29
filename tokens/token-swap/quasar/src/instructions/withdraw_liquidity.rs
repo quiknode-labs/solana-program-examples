@@ -6,40 +6,41 @@ use {
 
 /// Accounts for withdrawing liquidity from a pool.
 #[derive(Accounts)]
-pub struct WithdrawLiquidity<'info> {
+pub struct WithdrawLiquidity {
     #[account(seeds = [b"amm"], bump)]
-    pub amm: &'info Account<Amm>,
+    pub amm: Account<Amm>,
     #[account(seeds = [amm, mint_a, mint_b], bump)]
-    pub pool: &'info Account<Pool>,
+    pub pool: Account<Pool>,
     /// Pool authority PDA.
     #[account(seeds = [amm, mint_a, mint_b, crate::AUTHORITY_SEED], bump)]
-    pub pool_authority: &'info UncheckedAccount,
-    pub depositor: &'info Signer,
+    pub pool_authority: UncheckedAccount,
+    pub depositor: Signer,
     #[account(mut, seeds = [amm, mint_a, mint_b, crate::LIQUIDITY_SEED], bump)]
-    pub mint_liquidity: &'info mut Account<Mint>,
+    pub mint_liquidity: Account<Mint>,
     #[account(mut)]
-    pub mint_a: &'info mut Account<Mint>,
+    pub mint_a: Account<Mint>,
     #[account(mut)]
-    pub mint_b: &'info mut Account<Mint>,
+    pub mint_b: Account<Mint>,
     #[account(mut)]
-    pub pool_account_a: &'info mut Account<Token>,
+    pub pool_account_a: Account<Token>,
     #[account(mut)]
-    pub pool_account_b: &'info mut Account<Token>,
+    pub pool_account_b: Account<Token>,
     #[account(mut)]
-    pub depositor_account_liquidity: &'info mut Account<Token>,
+    pub depositor_account_liquidity: Account<Token>,
     #[account(mut, init_if_needed, payer = payer, token::mint = mint_a, token::authority = depositor)]
-    pub depositor_account_a: &'info mut Account<Token>,
+    pub depositor_account_a: Account<Token>,
     #[account(mut, init_if_needed, payer = payer, token::mint = mint_b, token::authority = depositor)]
-    pub depositor_account_b: &'info mut Account<Token>,
+    pub depositor_account_b: Account<Token>,
     #[account(mut)]
-    pub payer: &'info Signer,
-    pub token_program: &'info Program<Token>,
-    pub system_program: &'info Program<System>,
+    pub payer: Signer,
+    pub token_program: Program<Token>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
 pub fn handle_withdraw_liquidity(
-    accounts: &mut WithdrawLiquidity, amount: u64,
+    accounts: &mut WithdrawLiquidity,
+    amount: u64,
     bumps: &WithdrawLiquidityBumps,
 ) -> Result<(), ProgramError> {
     let bump = [bumps.pool_authority];
@@ -68,17 +69,17 @@ pub fn handle_withdraw_liquidity(
 
     // Transfer token A from pool to depositor.
     accounts.token_program
-        .transfer(accounts.pool_account_a, accounts.depositor_account_a, accounts.pool_authority, amount_a)
+        .transfer(&accounts.pool_account_a, &accounts.depositor_account_a, &accounts.pool_authority, amount_a)
         .invoke_signed(seeds)?;
 
     // Transfer token B from pool to depositor.
     accounts.token_program
-        .transfer(accounts.pool_account_b, accounts.depositor_account_b, accounts.pool_authority, amount_b)
+        .transfer(&accounts.pool_account_b, &accounts.depositor_account_b, &accounts.pool_authority, amount_b)
         .invoke_signed(seeds)?;
 
     // Burn LP tokens.
     accounts.token_program
-        .burn(accounts.depositor_account_liquidity, accounts.mint_liquidity, accounts.depositor, amount)
+        .burn(&accounts.depositor_account_liquidity, &accounts.mint_liquidity, &accounts.depositor, amount)
         .invoke()?;
 
     Ok(())

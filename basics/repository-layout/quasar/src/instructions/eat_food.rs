@@ -12,7 +12,7 @@ pub fn eat_food(
 
     let mut i = 0;
     while i < stands.len() {
-        if stands[i].name_matches(food_stand_name) {
+        if food::food_stand_name_matches(&stands[i], food_stand_name) {
             log("Welcome to the food stand!");
 
             if ticket_count < stands[i].tickets {

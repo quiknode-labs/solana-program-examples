@@ -13,17 +13,17 @@ use crate::state::{read_wallet_allowed, MODE_ALLOW, MODE_BLOCK, MODE_MIXED, AB_W
 ///   [4] extra_account_meta_list
 ///   [5] ab_wallet — resolved from extra account metas (PDA for destination owner)
 #[derive(Accounts)]
-pub struct TxHook<'info> {
-    pub source_token_account: &'info UncheckedAccount,
-    pub mint: &'info UncheckedAccount,
-    pub destination_token_account: &'info UncheckedAccount,
-    pub owner_delegate: &'info UncheckedAccount,
-    pub meta_list: &'info UncheckedAccount,
-    pub ab_wallet: &'info UncheckedAccount,
+pub struct TxHook {
+    pub source_token_account: UncheckedAccount,
+    pub mint: UncheckedAccount,
+    pub destination_token_account: UncheckedAccount,
+    pub owner_delegate: UncheckedAccount,
+    pub meta_list: UncheckedAccount,
+    pub ab_wallet: UncheckedAccount,
 }
 
 #[inline(always)]
-pub fn handle_tx_hook(accounts: &TxHook, amount: u64) -> Result<(), ProgramError> {
+pub fn handle_tx_hook(accounts: &mut TxHook, amount: u64) -> Result<(), ProgramError> {
     let mint_view = accounts.mint.to_account_view();
     let mint_data = mint_view.try_borrow()?;
 

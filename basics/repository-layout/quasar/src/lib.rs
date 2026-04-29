@@ -18,10 +18,10 @@ mod quasar_carnival {
     #[instruction(discriminator = 0)]
     pub fn go_on_ride(
         ctx: Ctx<CarnivalContext>,
-        name: String,
         height: u32,
         ticket_count: u32,
-        ride_name: String,
+        name: String<50>,
+        ride_name: String<50>,
     ) -> Result<(), ProgramError> {
         instructions::handle_go_on_ride(&mut ctx.accounts, name, height, ticket_count, ride_name)
     }
@@ -30,9 +30,9 @@ mod quasar_carnival {
     #[instruction(discriminator = 1)]
     pub fn play_game(
         ctx: Ctx<CarnivalContext>,
-        name: String,
         ticket_count: u32,
-        game_name: String,
+        name: String<50>,
+        game_name: String<50>,
     ) -> Result<(), ProgramError> {
         instructions::handle_play_game(&mut ctx.accounts, name, ticket_count, game_name)
     }
@@ -41,9 +41,9 @@ mod quasar_carnival {
     #[instruction(discriminator = 2)]
     pub fn eat_food(
         ctx: Ctx<CarnivalContext>,
-        name: String,
         ticket_count: u32,
-        food_stand_name: String,
+        name: String<50>,
+        food_stand_name: String<50>,
     ) -> Result<(), ProgramError> {
         instructions::handle_eat_food(&mut ctx.accounts, name, ticket_count, food_stand_name)
     }

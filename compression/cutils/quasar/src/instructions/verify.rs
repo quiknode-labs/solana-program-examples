@@ -1,6 +1,6 @@
 use crate::bubblegum_types::{get_asset_id, leaf_schema_v1_hash};
 use crate::*;
-use quasar_lang::cpi::{InstructionAccount, InstructionView};
+use quasar_lang::{cpi::{InstructionAccount, InstructionView}, remaining::RemainingAccounts};
 
 /// Maximum proof nodes for the merkle tree.
 const MAX_PROOF_NODES: usize = 24;
@@ -13,23 +13,20 @@ const VERIFY_LEAF_DISCRIMINATOR: [u8; 8] = [0x7c, 0xdc, 0x16, 0xdf, 0x68, 0x0a, 
 
 /// Accounts for verifying a compressed NFT leaf in the merkle tree.
 #[derive(Accounts)]
-pub struct Verify<'info> {
-    pub leaf_owner: &'info Signer,
+pub struct Verify {
+    pub leaf_owner: Signer,
     /// Leaf delegate.
-    pub leaf_delegate: &'info UncheckedAccount,
+    pub leaf_delegate: UncheckedAccount,
     /// Merkle tree to verify against.
-    pub merkle_tree: &'info UncheckedAccount,
+    pub merkle_tree: UncheckedAccount,
     /// SPL Account Compression program.
     #[account(address = SPL_ACCOUNT_COMPRESSION_ID)]
-    pub compression_program: &'info UncheckedAccount,
+    pub compression_program: UncheckedAccount,
 }
 
-pub fn handle_verify<'info>(
-    accounts: &Verify<'info>, ctx: &CtxWithRemaining<'info, Verify<'info>>,
-) -> Result<(), ProgramError> {
+pub fn handle_verify(accounts: &mut Verify, data: &[u8], remaining: RemainingAccounts<'_>) -> Result<(), ProgramError> {
     // Parse verify params from instruction data:
     // root(32) + data_hash(32) + creator_hash(32) + nonce(8) + index(4) = 108 bytes
-    let data = ctx.data;
     if data.len() < 108 {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -59,7 +56,6 @@ pub fn handle_verify<'info>(
     ix_data[72..76].copy_from_slice(&index.to_le_bytes());
 
     // Collect proof nodes
-    let remaining = ctx.remaining_accounts();
     let placeholder = accounts.compression_program.to_account_view().clone();
     let mut proof_views: [AccountView; MAX_PROOF_NODES] =
         core::array::from_fn(|_| placeholder.clone());

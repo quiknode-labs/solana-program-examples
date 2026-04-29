@@ -1,13 +1,10 @@
-use {
-    crate::state::Counter,
-    quasar_lang::prelude::*,
-};
+use {crate::state::Counter, quasar_lang::prelude::*};
 
 /// Accounts for incrementing a counter.
 #[derive(Accounts)]
-pub struct Increment<'info> {
+pub struct Increment {
     #[account(mut)]
-    pub counter: &'info mut Account<Counter>,
+    pub counter: Account<Counter>,
 }
 
 #[inline(always)]

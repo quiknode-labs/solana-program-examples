@@ -1,4 +1,4 @@
-use quasar_lang::cpi::{BufCpiCall, InstructionAccount};
+use quasar_lang::cpi::DynCpiCall;
 use quasar_lang::prelude::*;
 use quasar_lang::sysvars::Sysvar;
 
@@ -7,17 +7,17 @@ use crate::instructions::init_mint::Token2022;
 use crate::state::mode_to_metadata_value;
 
 #[derive(Accounts)]
-pub struct ChangeMode<'info> {
+pub struct ChangeMode {
     #[account(mut)]
-    pub authority: &'info Signer,
+    pub authority: Signer,
     #[account(mut)]
-    pub mint: &'info UncheckedAccount,
-    pub token_program: &'info Program<Token2022>,
-    pub system_program: &'info Program<System>,
+    pub mint: UncheckedAccount,
+    pub token_program: Program<Token2022>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_change_mode(accounts: &ChangeMode, mode: u8, threshold: u64) -> Result<(), ProgramError> {
+pub fn handle_change_mode(accounts: &mut ChangeMode, mode: u8, threshold: u64) -> Result<(), ProgramError> {
     let mode_value = mode_to_metadata_value(mode);
     let token_prog = accounts.token_program.to_account_view().address();
     let mint_key = accounts.mint.to_account_view().address();
@@ -52,7 +52,7 @@ pub fn handle_change_mode(accounts: &ChangeMode, mode: u8, threshold: u64) -> Re
     if min_balance > current_lamports {
         let diff = min_balance - current_lamports;
         accounts.system_program
-            .transfer(accounts.authority, &*accounts.mint, diff)
+            .transfer(&accounts.authority, &accounts.mint, diff)
             .invoke()?;
     }
 
@@ -65,7 +65,7 @@ fn emit_update_field(
     token_prog: &Address,
     mint_key: &Address,
     auth_key: &Address,
-    ctx: &ChangeMode<'_>,
+    ctx: &ChangeMode,
     key: &[u8],
     value: &[u8],
 ) -> Result<(), ProgramError> {
@@ -86,24 +86,18 @@ fn emit_update_field(
     buf[pos..pos + value.len()].copy_from_slice(value);
     pos += value.len();
 
-    BufCpiCall::new(
-        token_prog,
-        [
-            InstructionAccount::writable(mint_key),
-            InstructionAccount::readonly_signer(auth_key),
-        ],
-        [
-            ctx.mint.to_account_view(),
-            ctx.authority.to_account_view(),
-        ],
-        buf,
-        pos,
-    )
-    .invoke()
+    let _ = (mint_key, auth_key);
+    let mut cpi = DynCpiCall::<2, MAX_META_IX>::new(token_prog);
+    // mint: writable, not signer
+    cpi.push_account(ctx.mint.to_account_view(), false, true)?;
+    // authority: signer, not writable
+    cpi.push_account(ctx.authority.to_account_view(), true, false)?;
+    cpi.set_data(&buf[..pos])?;
+    cpi.invoke()
 }
 
 /// Check if the mint's metadata already contains a "threshold" key.
-fn has_threshold_in_metadata(ctx: &ChangeMode<'_>) -> Result<bool, ProgramError> {
+fn has_threshold_in_metadata(ctx: &ChangeMode) -> Result<bool, ProgramError> {
     let mint_view = ctx.mint.to_account_view();
     let data = mint_view.try_borrow()?;
 

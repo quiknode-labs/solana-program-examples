@@ -20,16 +20,20 @@ fn empty(address: Pubkey) -> Account {
     }
 }
 
-/// Build set_favorites instruction data.
-/// Wire format: [disc=0] [ZC: number(u64)] [color: u32 prefix + bytes]
+/// Build set_favorites instruction data using Quasar's compact wire format
+/// (header then tail). `String<50>` defaults to a u8 length prefix.
+///
+///   header: [disc: u8 = 0][number: u64 LE][color_len: u8]
+///   tail:   [color bytes]
 fn build_set_favorites(number: u64, color: &str) -> Vec<u8> {
-    let mut data = vec![0u8]; // discriminator = 0
+    let mut data = Vec::with_capacity(10 + color.len());
 
-    // Fixed ZC args: number (u64, but as Pod it's le bytes)
+    // Header
+    data.push(0u8); // discriminator
     data.extend_from_slice(&number.to_le_bytes());
+    data.push(color.len() as u8);
 
-    // Dynamic String arg: color with u32 prefix
-    data.extend_from_slice(&(color.len() as u32).to_le_bytes());
+    // Tail
     data.extend_from_slice(color.as_bytes());
 
     data

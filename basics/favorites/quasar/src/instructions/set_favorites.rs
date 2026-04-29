@@ -1,25 +1,26 @@
 use {
-    crate::state::Favorites,
-    quasar_lang::prelude::*,
+    crate::state::{Favorites, FavoritesInner},
+    quasar_lang::{prelude::*, sysvars::Sysvar},
 };
 
 /// Accounts for setting user favourites. Uses `init_if_needed` so the same
 /// instruction can create or update the favourites PDA.
 #[derive(Accounts)]
-pub struct SetFavorites<'info> {
+pub struct SetFavorites {
     #[account(mut)]
-    pub user: &'info mut Signer,
-    #[account(mut, init_if_needed, payer = user, seeds = [b"favorites", user], bump)]
-    pub favorites: Account<Favorites<'info>>,
-    pub system_program: &'info Program<System>,
+    pub user: Signer,
+    #[account(mut, init_if_needed, payer = user, seeds = Favorites::seeds(user), bump)]
+    pub favorites: Account<Favorites>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
 pub fn handle_set_favorites(accounts: &mut SetFavorites, number: u64, color: &str) -> Result<(), ProgramError> {
+    let rent = Rent::get()?;
     accounts.favorites.set_inner(
-        number,
-        color,
+        FavoritesInner { number, color },
         accounts.user.to_account_view(),
-        None,
+        rent.lamports_per_byte(),
+        rent.exemption_threshold_raw(),
     )
 }

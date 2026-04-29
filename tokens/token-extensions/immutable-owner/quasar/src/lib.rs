@@ -32,27 +32,28 @@ mod quasar_immutable_owner {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct Initialize {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub token_account: &'info Signer,
-    pub mint_account: &'info UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub token_account: Signer,
+    pub mint_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
+fn handle_initialize(accounts: &mut Initialize) -> Result<(), ProgramError> {
     // 165 (base) + 1 (account type) + 4 (TLV header, ImmutableOwner is zero-size) = 170 bytes
     let account_size: u64 = 170;
     let lamports = Rent::get()?.try_minimum_balance(account_size as usize)?;
 
     // 1. Create account
-    accounts.system_program
+    accounts
+        .system_program
         .create_account(
-            accounts.payer,
-            accounts.token_account,
+            &accounts.payer,
+            &accounts.token_account,
             lamports,
             account_size,
             accounts.token_program.to_account_view().address(),

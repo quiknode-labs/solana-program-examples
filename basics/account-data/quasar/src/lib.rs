@@ -25,10 +25,10 @@ mod quasar_account_data {
     #[instruction(discriminator = 0)]
     pub fn create_address_info(
         ctx: Ctx<CreateAddressInfo>,
-        name: String,
         house_number: u8,
-        street: String,
-        city: String,
+        name: String<50>,
+        street: String<50>,
+        city: String<50>,
     ) -> Result<(), ProgramError> {
         instructions::handle_create_address_info(&mut ctx.accounts, name, house_number, street, city)
     }

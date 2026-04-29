@@ -46,18 +46,18 @@ mod quasar_token_2022_basics {
 
 /// Accounts for minting tokens via Token-2022.
 #[derive(Accounts)]
-pub struct MintToken<'info> {
+pub struct MintToken {
     #[account(mut)]
-    pub authority: &'info Signer,
+    pub authority: Signer,
     #[account(mut)]
-    pub mint: &'info mut UncheckedAccount,
+    pub mint: UncheckedAccount,
     #[account(mut)]
-    pub receiver: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub receiver: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
 #[inline(always)]
-pub fn handle_mint_token(accounts: &mut MintToken, amount: u64) -> Result<(), ProgramError> {
+fn handle_mint_token(accounts: &mut MintToken, amount: u64) -> Result<(), ProgramError> {
     // SPL Token MintTo instruction: opcode 7, amount as u64 LE.
     let data = build_u64_data(7, amount);
     CpiCall::new(
@@ -79,19 +79,19 @@ pub fn handle_mint_token(accounts: &mut MintToken, amount: u64) -> Result<(), Pr
 
 /// Accounts for transferring tokens via Token-2022 transfer_checked.
 #[derive(Accounts)]
-pub struct TransferToken<'info> {
+pub struct TransferToken {
     #[account(mut)]
-    pub sender: &'info Signer,
+    pub sender: Signer,
     #[account(mut)]
-    pub from: &'info mut UncheckedAccount,
-    pub mint: &'info UncheckedAccount,
+    pub from: UncheckedAccount,
+    pub mint: UncheckedAccount,
     #[account(mut)]
-    pub to: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub to: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
 #[inline(always)]
-pub fn handle_transfer_token(accounts: &mut TransferToken, amount: u64) -> Result<(), ProgramError> {
+fn handle_transfer_token(accounts: &mut TransferToken, amount: u64) -> Result<(), ProgramError> {
     // SPL Token TransferChecked instruction: opcode 12, amount as u64 LE, decimals as u8.
     let data = build_transfer_checked_data(amount, 6);
     CpiCall::new(

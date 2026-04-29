@@ -6,10 +6,10 @@ use {
 /// Accounts for incrementing page visits.
 /// The user account is needed to derive the PDA seeds for validation.
 #[derive(Accounts)]
-pub struct IncrementPageVisits<'info> {
-    pub user: &'info UncheckedAccount,
+pub struct IncrementPageVisits {
+    pub user: UncheckedAccount,
     #[account(mut)]
-    pub page_visits: &'info mut Account<PageVisits>,
+    pub page_visits: Account<PageVisits>,
 }
 
 #[inline(always)]

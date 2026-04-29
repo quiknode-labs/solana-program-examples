@@ -45,26 +45,27 @@ mod quasar_default_account_state {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct Initialize {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub mint_account: &'info Signer,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub mint_account: Signer,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
+fn handle_initialize(accounts: &mut Initialize) -> Result<(), ProgramError> {
     // 165 (base account) + 1 (account type) + 4 (TLV header) + 1 (DefaultAccountState data) = 171 bytes
     let mint_size: u64 = 171;
     let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
 
     // 1. Create account owned by Token-2022
-    accounts.system_program
+    accounts
+        .system_program
         .create_account(
-            accounts.payer,
-            accounts.mint_account,
+            &accounts.payer,
+            &accounts.mint_account,
             lamports,
             mint_size,
             accounts.token_program.to_account_view().address(),
@@ -106,25 +107,26 @@ pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
 }
 
 #[derive(Accounts)]
-pub struct UpdateDefaultState<'info> {
+pub struct UpdateDefaultState {
     #[account(mut)]
-    pub freeze_authority: &'info Signer,
+    pub freeze_authority: Signer,
     #[account(mut)]
-    pub mint_account: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub mint_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
 #[inline(always)]
-pub fn handle_update_default_state(accounts: &UpdateDefaultState, account_state: u8) -> Result<(), ProgramError> {
+fn handle_update_default_state(
+    accounts: &mut UpdateDefaultState,
+    account_state: u8,
+) -> Result<(), ProgramError> {
     // DefaultAccountState Update: opcode 28, sub-opcode 1, new state
     let data: [u8; 3] = [28, 1, account_state];
     CpiCall::new(
         accounts.token_program.to_account_view().address(),
         [
             InstructionAccount::writable(accounts.mint_account.to_account_view().address()),
-            InstructionAccount::readonly_signer(
-                accounts.freeze_authority.to_account_view().address(),
-            ),
+            InstructionAccount::readonly_signer(accounts.freeze_authority.to_account_view().address()),
         ],
         [
             accounts.mint_account.to_account_view(),

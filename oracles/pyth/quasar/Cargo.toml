@@ -22,9 +22,9 @@ client = []
 debug = []
 
 [dependencies]
-quasar-lang = "0.0"
+quasar-lang = { git = "https://github.com/blueshift-gg/quasar" }
 solana-instruction = { version = "3.2.0" }
 
 [dev-dependencies]
-quasar-svm = { version = "0.1" }
+quasar-svm = { git = "https://github.com/blueshift-gg/quasar-svm" }
 solana-address = { version = "2.2.0", features = ["decode"] }

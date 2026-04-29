@@ -22,8 +22,8 @@ mod quasar_rent {
     #[instruction(discriminator = 0)]
     pub fn create_system_account(
         ctx: Ctx<CreateSystemAccount>,
-        name: String,
-        address: String,
+        name: String<50>,
+        address: String<50>,
     ) -> Result<(), ProgramError> {
         instructions::handle_create_system_account(&mut ctx.accounts, name, address)
     }

@@ -2,7 +2,8 @@ use quasar_lang::prelude::*;
 
 /// Escrow state: records the maker's desired receive amount and the
 /// associated mint/token-account addresses.
-#[account(discriminator = 1)]
+#[account(discriminator = 1, set_inner)]
+#[seeds(b"escrow", maker: Address)]
 pub struct Escrow {
     pub maker: Address,
     pub mint_a: Address,

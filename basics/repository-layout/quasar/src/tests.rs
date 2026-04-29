@@ -10,59 +10,63 @@ fn signer(address: Pubkey) -> Account {
     quasar_svm::token::create_keyed_system_account(&address, 10_000_000_000)
 }
 
-/// Build go_on_ride instruction data (discriminator = 0).
-/// Wire format: [disc=0] [ZC: height(u32), ticket_count(u32)] [name: String] [ride_name: String]
+/// Build go_on_ride instruction data using Quasar's compact wire format
+/// (header then tail). `String<50>` defaults to a u8 length prefix.
+///
+///   header: [disc: u8 = 0][height: u32 LE][ticket_count: u32 LE][name_len: u8][ride_name_len: u8]
+///   tail:   [name bytes][ride_name bytes]
 fn build_go_on_ride(name: &str, height: u32, ticket_count: u32, ride_name: &str) -> Vec<u8> {
-    let mut data = vec![0u8]; // discriminator = 0
+    let mut data = Vec::with_capacity(11 + name.len() + ride_name.len());
 
-    // Fixed ZC fields: height, ticket_count
+    // Header
+    data.push(0u8); // discriminator
     data.extend_from_slice(&height.to_le_bytes());
     data.extend_from_slice(&ticket_count.to_le_bytes());
+    data.push(name.len() as u8);
+    data.push(ride_name.len() as u8);
 
-    // Dynamic String: name
-    data.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    // Tail
     data.extend_from_slice(name.as_bytes());
-
-    // Dynamic String: ride_name
-    data.extend_from_slice(&(ride_name.len() as u32).to_le_bytes());
     data.extend_from_slice(ride_name.as_bytes());
 
     data
 }
 
-/// Build play_game instruction data (discriminator = 1).
-/// Wire format: [disc=1] [ZC: ticket_count(u32)] [name: String] [game_name: String]
+/// Build play_game instruction data using the same compact wire format.
+///
+///   header: [disc: u8 = 1][ticket_count: u32 LE][name_len: u8][game_name_len: u8]
+///   tail:   [name bytes][game_name bytes]
 fn build_play_game(name: &str, ticket_count: u32, game_name: &str) -> Vec<u8> {
-    let mut data = vec![1u8]; // discriminator = 1
+    let mut data = Vec::with_capacity(7 + name.len() + game_name.len());
 
-    // Fixed ZC: ticket_count
+    // Header
+    data.push(1u8); // discriminator
     data.extend_from_slice(&ticket_count.to_le_bytes());
+    data.push(name.len() as u8);
+    data.push(game_name.len() as u8);
 
-    // Dynamic String: name
-    data.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    // Tail
     data.extend_from_slice(name.as_bytes());
-
-    // Dynamic String: game_name
-    data.extend_from_slice(&(game_name.len() as u32).to_le_bytes());
     data.extend_from_slice(game_name.as_bytes());
 
     data
 }
 
-/// Build eat_food instruction data (discriminator = 2).
-/// Wire format: [disc=2] [ZC: ticket_count(u32)] [name: String] [food_stand_name: String]
+/// Build eat_food instruction data using the same compact wire format.
+///
+///   header: [disc: u8 = 2][ticket_count: u32 LE][name_len: u8][food_stand_name_len: u8]
+///   tail:   [name bytes][food_stand_name bytes]
 fn build_eat_food(name: &str, ticket_count: u32, food_stand_name: &str) -> Vec<u8> {
-    let mut data = vec![2u8]; // discriminator = 2
+    let mut data = Vec::with_capacity(7 + name.len() + food_stand_name.len());
 
-    // Fixed ZC: ticket_count
+    // Header
+    data.push(2u8); // discriminator
     data.extend_from_slice(&ticket_count.to_le_bytes());
+    data.push(name.len() as u8);
+    data.push(food_stand_name.len() as u8);
 
-    // Dynamic String: name
-    data.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    // Tail
     data.extend_from_slice(name.as_bytes());
-
-    // Dynamic String: food_stand_name
-    data.extend_from_slice(&(food_stand_name.len() as u32).to_le_bytes());
     data.extend_from_slice(food_stand_name.as_bytes());
 
     data

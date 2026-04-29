@@ -12,7 +12,7 @@ pub fn play_game(
 
     let mut i = 0;
     while i < games.len() {
-        if games[i].name_matches(game_name) {
+        if game::game_name_matches(&games[i], game_name) {
             log("You're about to play a game!");
 
             if ticket_count < games[i].tickets {

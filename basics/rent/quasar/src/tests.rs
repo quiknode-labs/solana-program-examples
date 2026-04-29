@@ -20,18 +20,22 @@ fn empty(address: Pubkey) -> Account {
     }
 }
 
-/// Build create_system_account instruction data (discriminator = 0).
-/// Wire format: [disc=0] [name: String] [address: String]
-/// Both String args are dynamic (u32 length prefix + bytes).
+/// Build create_system_account instruction data using Quasar's compact
+/// wire format (header then tail). `String<50>` defaults to a u8 length
+/// prefix (the second `String` generic argument is the prefix type).
+///
+///   header: [disc: u8 = 0][name_len: u8][address_len: u8]
+///   tail:   [name bytes][address bytes]
 fn build_create_system_account(name: &str, address: &str) -> Vec<u8> {
-    let mut data = vec![0u8]; // discriminator = 0
+    let mut data = Vec::with_capacity(3 + name.len() + address.len());
 
-    // Dynamic String: name
-    data.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    // Header
+    data.push(0u8); // discriminator
+    data.push(name.len() as u8);
+    data.push(address.len() as u8);
+
+    // Tail
     data.extend_from_slice(name.as_bytes());
-
-    // Dynamic String: address
-    data.extend_from_slice(&(address.len() as u32).to_le_bytes());
     data.extend_from_slice(address.as_bytes());
 
     data

@@ -32,39 +32,39 @@ mod quasar_transfer_tokens {
 
 /// Accounts for minting tokens to a recipient.
 #[derive(Accounts)]
-pub struct MintTokens<'info> {
+pub struct MintTokens {
     #[account(mut)]
-    pub mint_authority: &'info Signer,
+    pub mint_authority: Signer,
     #[account(mut)]
-    pub mint: &'info mut Account<Mint>,
+    pub mint: Account<Mint>,
     /// The recipient's token account. Must already exist.
     #[account(mut)]
-    pub recipient_token_account: &'info mut Account<Token>,
-    pub token_program: &'info Program<Token>,
+    pub recipient_token_account: Account<Token>,
+    pub token_program: Program<Token>,
 }
 
 #[inline(always)]
-pub fn handle_mint_tokens(accounts: &mut MintTokens, amount: u64) -> Result<(), ProgramError> {
+fn handle_mint_tokens(accounts: &mut MintTokens, amount: u64) -> Result<(), ProgramError> {
     accounts.token_program
-        .mint_to(accounts.mint, accounts.recipient_token_account, accounts.mint_authority, amount)
+        .mint_to(&accounts.mint, &accounts.recipient_token_account, &accounts.mint_authority, amount)
         .invoke()
 }
 
 /// Accounts for transferring tokens between two token accounts.
 #[derive(Accounts)]
-pub struct TransferTokens<'info> {
+pub struct TransferTokens {
     #[account(mut)]
-    pub sender: &'info Signer,
+    pub sender: Signer,
     #[account(mut)]
-    pub sender_token_account: &'info mut Account<Token>,
+    pub sender_token_account: Account<Token>,
     #[account(mut)]
-    pub recipient_token_account: &'info mut Account<Token>,
-    pub token_program: &'info Program<Token>,
+    pub recipient_token_account: Account<Token>,
+    pub token_program: Program<Token>,
 }
 
 #[inline(always)]
-pub fn handle_transfer_tokens(accounts: &mut TransferTokens, amount: u64) -> Result<(), ProgramError> {
+fn handle_transfer_tokens(accounts: &mut TransferTokens, amount: u64) -> Result<(), ProgramError> {
     accounts.token_program
-        .transfer(accounts.sender_token_account, accounts.recipient_token_account, accounts.sender, amount)
+        .transfer(&accounts.sender_token_account, &accounts.recipient_token_account, &accounts.sender, amount)
         .invoke()
 }

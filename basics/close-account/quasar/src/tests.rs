@@ -20,11 +20,15 @@ fn empty(address: Pubkey) -> Account {
     }
 }
 
-/// Build create_user instruction data.
-/// Wire format: [disc=0] [name: u32 prefix + bytes]
+/// Build create_user instruction data using Quasar's compact wire format
+/// (header then tail). `String<50>` defaults to a u8 length prefix.
+///
+///   header: [disc: u8 = 0][name_len: u8]
+///   tail:   [name bytes]
 fn build_create_instruction(name: &str) -> Vec<u8> {
-    let mut data = vec![0u8]; // discriminator = 0
-    data.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    let mut data = Vec::with_capacity(2 + name.len());
+    data.push(0u8); // discriminator
+    data.push(name.len() as u8);
     data.extend_from_slice(name.as_bytes());
     data
 }

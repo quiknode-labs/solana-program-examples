@@ -7,11 +7,9 @@ pub struct Ride {
     pub min_height: u32,
 }
 
-impl Ride {
-    /// Check if a ride name matches (byte comparison, no alloc).
-    pub fn name_matches(&self, other: &str) -> bool {
-        self.name.as_bytes() == other.as_bytes()
-    }
+/// Check if a ride name matches (byte comparison, no alloc).
+pub fn ride_name_matches(ride: &Ride, other: &str) -> bool {
+    ride.name.as_bytes() == other.as_bytes()
 }
 
 /// Static list of carnival rides.

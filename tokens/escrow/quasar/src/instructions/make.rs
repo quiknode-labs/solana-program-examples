@@ -1,44 +1,44 @@
 use {
-    crate::state::Escrow,
+    crate::state::{Escrow, EscrowInner},
     quasar_lang::prelude::*,
     quasar_spl::{Mint, Token, TokenCpi},
 };
 
 #[derive(Accounts)]
-pub struct Make<'info> {
+pub struct Make {
     #[account(mut)]
-    pub maker: &'info Signer,
-    #[account(mut, init, payer = maker, seeds = [b"escrow", maker], bump)]
-    pub escrow: &'info mut Account<Escrow>,
-    pub mint_a: &'info Account<Mint>,
-    pub mint_b: &'info Account<Mint>,
+    pub maker: Signer,
+    #[account(mut, init, payer = maker, seeds = Escrow::seeds(maker), bump)]
+    pub escrow: Account<Escrow>,
+    pub mint_a: Account<Mint>,
+    pub mint_b: Account<Mint>,
     #[account(mut)]
-    pub maker_ta_a: &'info mut Account<Token>,
+    pub maker_ta_a: Account<Token>,
     #[account(mut, init_if_needed, payer = maker, token::mint = mint_b, token::authority = maker)]
-    pub maker_ta_b: &'info mut Account<Token>,
+    pub maker_ta_b: Account<Token>,
     #[account(mut, init_if_needed, payer = maker, token::mint = mint_a, token::authority = escrow)]
-    pub vault_ta_a: &'info mut Account<Token>,
-    pub rent: &'info Sysvar<Rent>,
-    pub token_program: &'info Program<Token>,
-    pub system_program: &'info Program<System>,
+    pub vault_ta_a: Account<Token>,
+    pub rent: Sysvar<Rent>,
+    pub token_program: Program<Token>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
 pub fn handle_make_escrow(accounts: &mut Make, receive: u64, bumps: &MakeBumps) -> Result<(), ProgramError> {
-    accounts.escrow.set_inner(
-        *accounts.maker.address(),
-        *accounts.mint_a.address(),
-        *accounts.mint_b.address(),
-        *accounts.maker_ta_b.address(),
+    accounts.escrow.set_inner(EscrowInner {
+        maker: *accounts.maker.address(),
+        mint_a: *accounts.mint_a.address(),
+        mint_b: *accounts.mint_b.address(),
+        maker_ta_b: *accounts.maker_ta_b.address(),
         receive,
-        bumps.escrow,
-    );
+        bump: bumps.escrow,
+    });
     Ok(())
 }
 
 #[inline(always)]
 pub fn handle_deposit_tokens(accounts: &mut Make, amount: u64) -> Result<(), ProgramError> {
     accounts.token_program
-        .transfer(accounts.maker_ta_a, accounts.vault_ta_a, accounts.maker, amount)
+        .transfer(&accounts.maker_ta_a, &accounts.vault_ta_a, &accounts.maker, amount)
         .invoke()
 }

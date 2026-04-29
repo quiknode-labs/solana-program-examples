@@ -36,12 +36,12 @@ mod quasar_token_fundraiser {
     /// Maker withdraws all funds once the target is met.
     #[instruction(discriminator = 2)]
     pub fn check_contributions(ctx: Ctx<CheckContributions>) -> Result<(), ProgramError> {
-        instructions::handle_check_contributions(&mut ctx.accounts, ctx.bumps.fundraiser)
+        instructions::handle_check_contributions(&mut ctx.accounts, &ctx.bumps)
     }
 
     /// Contributors reclaim their tokens if the fundraiser fails.
     #[instruction(discriminator = 3)]
     pub fn refund(ctx: Ctx<Refund>) -> Result<(), ProgramError> {
-        instructions::handle_refund(&mut ctx.accounts, ctx.bumps.fundraiser)
+        instructions::handle_refund(&mut ctx.accounts, &ctx.bumps)
     }
 }

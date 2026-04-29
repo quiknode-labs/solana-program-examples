@@ -36,7 +36,7 @@ mod quasar_abl_token {
     ///   name: [u8; 32], name_len: u8
     ///   symbol: [u8; 10], symbol_len: u8
     ///   uri: [u8; 128], uri_len: u8
-    #[instruction(discriminator = [0, 0, 0, 0, 0, 0, 0, 0])]
+    #[instruction(discriminator = [1, 0, 0, 0, 0, 0, 0, 0])]
     pub fn init_mint(
         ctx: Ctx<InitMint>,
         decimals: u8,

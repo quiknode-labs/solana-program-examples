@@ -20,28 +20,28 @@ fn empty(address: Pubkey) -> Account {
     }
 }
 
-/// Build create_address_info instruction data manually.
+/// Build the create_address_info instruction data using Quasar's compact
+/// wire format: a header containing all fixed fields and length prefixes,
+/// followed by a tail with all dynamic byte payloads grouped together.
 ///
-/// Wire format (from reading the #[instruction] codegen):
-///   [disc: 1 byte]
-///   [ZC struct: house_number u8]
-///   [name: u32 LE length prefix + bytes]  (String → DynKind::Str with U32 prefix)
-///   [street: u32 LE length prefix + bytes]
-///   [city: u32 LE length prefix + bytes]
+/// Layout:
+///   header: [disc: u8 = 0][house_number: u8][name_len: u8][street_len: u8][city_len: u8]
+///   tail:   [name bytes][street bytes][city bytes]
+///
+/// `String<50>` defaults to a u8 length prefix because MAX (50) fits in a byte.
 fn build_create_instruction_data(name: &str, house_number: u8, street: &str, city: &str) -> Vec<u8> {
-    let mut data = vec![0u8]; // discriminator = 0
+    let mut data = Vec::with_capacity(5 + name.len() + street.len() + city.len());
 
-    // Fixed ZC struct: house_number
+    // Header
+    data.push(0u8); // instruction discriminator
     data.push(house_number);
+    data.push(name.len() as u8);
+    data.push(street.len() as u8);
+    data.push(city.len() as u8);
 
-    // Dynamic String args with u32 length prefix
-    data.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    // Tail
     data.extend_from_slice(name.as_bytes());
-
-    data.extend_from_slice(&(street.len() as u32).to_le_bytes());
     data.extend_from_slice(street.as_bytes());
-
-    data.extend_from_slice(&(city.len() as u32).to_le_bytes());
     data.extend_from_slice(city.as_bytes());
 
     data
@@ -81,34 +81,25 @@ fn test_create_address_info() {
     // Verify the account data.
     let account = result.account(&address_info).unwrap();
 
-    // Onchain layout (from #[account] dynamic codegen):
-    //   [disc: 1 byte = 1]
-    //   [ZC header: house_number u8]
-    //   [name: u8 prefix + bytes]   (String<u8, 50> uses u8 prefix)
-    //   [street: u8 prefix + bytes]
-    //   [city: u8 prefix + bytes]
+    // Onchain layout for a Quasar `#[account]` with dynamic fields uses the
+    // compact "header then tail" format. Length prefixes are grouped in the
+    // header, the actual bytes follow in the tail.
+    //   header: [disc: 1][house_number: u8][name_len: u8][street_len: u8][city_len: u8]
+    //   tail:   [name bytes][street bytes][city bytes]
+    // String<50> defaults to a u8 length prefix because MAX (50) fits in a byte.
     assert_eq!(account.data[0], 1, "discriminator");
     assert_eq!(account.data[1], 42, "house_number");
-
-    let mut offset = 2;
-
-    // name: u8 prefix + "Alice"
-    let name_len = account.data[offset] as usize;
-    offset += 1;
+    let name_len = account.data[2] as usize;
+    let street_len = account.data[3] as usize;
+    let city_len = account.data[4] as usize;
     assert_eq!(name_len, 5);
-    assert_eq!(&account.data[offset..offset + name_len], b"Alice");
-    offset += name_len;
-
-    // street: u8 prefix + "Main Street"
-    let street_len = account.data[offset] as usize;
-    offset += 1;
     assert_eq!(street_len, 11);
-    assert_eq!(&account.data[offset..offset + street_len], b"Main Street");
-    offset += street_len;
-
-    // city: u8 prefix + "New York"
-    let city_len = account.data[offset] as usize;
-    offset += 1;
     assert_eq!(city_len, 8);
-    assert_eq!(&account.data[offset..offset + city_len], b"New York");
+
+    let header_end = 5;
+    assert_eq!(&account.data[header_end..header_end + name_len], b"Alice");
+    let street_start = header_end + name_len;
+    assert_eq!(&account.data[street_start..street_start + street_len], b"Main Street");
+    let city_start = street_start + street_len;
+    assert_eq!(&account.data[city_start..city_start + city_len], b"New York");
 }

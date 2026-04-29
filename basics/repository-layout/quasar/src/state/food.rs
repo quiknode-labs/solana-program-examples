@@ -5,10 +5,8 @@ pub struct FoodStand {
     pub tickets: u32,
 }
 
-impl FoodStand {
-    pub fn name_matches(&self, other: &str) -> bool {
-        self.name.as_bytes() == other.as_bytes()
-    }
+pub fn food_stand_name_matches(stand: &FoodStand, other: &str) -> bool {
+    stand.name.as_bytes() == other.as_bytes()
 }
 
 /// Static list of food stands.

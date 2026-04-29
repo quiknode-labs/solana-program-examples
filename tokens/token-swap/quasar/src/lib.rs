@@ -67,6 +67,12 @@ mod quasar_token_swap {
         input_amount: u64,
         min_output_amount: u64,
     ) -> Result<(), ProgramError> {
-        instructions::handle_swap_exact_tokens_for_tokens(&mut ctx.accounts, swap_a, input_amount, min_output_amount, &ctx.bumps)
+        instructions::handle_swap_exact_tokens_for_tokens(
+            &mut ctx.accounts,
+            swap_a,
+            input_amount,
+            min_output_amount,
+            &ctx.bumps,
+        )
     }
 }

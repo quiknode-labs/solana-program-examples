@@ -1,18 +1,18 @@
-use quasar_lang::prelude::*;
+use quasar_lang::{prelude::*, sysvars::Sysvar};
 
 /// Accounts for creating a new account funded by the rent vault PDA.
 /// The rent vault signs the create_account CPI via PDA seeds.
 #[derive(Accounts)]
-pub struct CreateNewAccount<'info> {
+pub struct CreateNewAccount {
     #[account(mut)]
-    pub new_account: &'info Signer,
+    pub new_account: Signer,
     #[account(mut, seeds = [b"rent_vault"], bump)]
-    pub rent_vault: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub rent_vault: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_create_new_account(accounts: &CreateNewAccount, rent_vault_bump: u8) -> Result<(), ProgramError> {
+pub fn handle_create_new_account(accounts: &mut CreateNewAccount, rent_vault_bump: u8) -> Result<(), ProgramError> {
     // Build PDA signer seeds: ["rent_vault", bump].
     let bump_bytes = [rent_vault_bump];
     let seeds: &[Seed] = &[
@@ -21,15 +21,10 @@ pub fn handle_create_new_account(accounts: &CreateNewAccount, rent_vault_bump: u
     ];
 
     let system_program_address = Address::default();
+    let rent = Rent::get()?;
+    let lamports = rent.minimum_balance_unchecked(0);
 
-    // Create a zero-data system-owned account, funded from the vault.
     accounts.system_program
-        .create_account_with_minimum_balance(
-            accounts.rent_vault,
-            accounts.new_account,
-            0, // space: zero bytes of data
-            &system_program_address,
-            None, // fetch Rent sysvar automatically
-        )?
+        .create_account(&accounts.rent_vault, &accounts.new_account, lamports, 0u64, &system_program_address)
         .invoke_signed(seeds)
 }

@@ -22,7 +22,7 @@ mod quasar_favorites {
     pub fn set_favorites(
         ctx: Ctx<SetFavorites>,
         number: u64,
-        color: String,
+        color: String<50>,
     ) -> Result<(), ProgramError> {
         instructions::handle_set_favorites(&mut ctx.accounts, number, color)
     }

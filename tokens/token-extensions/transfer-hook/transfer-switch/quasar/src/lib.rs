@@ -34,7 +34,7 @@ mod quasar_transfer_hook_switch {
     pub fn initialize_extra_account_metas_list(
         ctx: Ctx<InitializeExtraAccountMetas>,
     ) -> Result<(), ProgramError> {
-        handle_initialize(&mut ctx.accounts)
+        handle_initialize_extra_account_metas_list(&mut ctx.accounts)
     }
 
     /// Toggle the transfer switch for a wallet.
@@ -61,17 +61,17 @@ mod quasar_transfer_hook_switch {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct ConfigureAdmin<'info> {
+pub struct ConfigureAdmin {
     #[account(mut)]
-    pub admin: &'info Signer,
-    pub new_admin: &'info UncheckedAccount,
+    pub admin: Signer,
+    pub new_admin: UncheckedAccount,
     #[account(mut)]
-    pub admin_config: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub admin_config: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_configure_admin(accounts: &ConfigureAdmin) -> Result<(), ProgramError> {
+fn handle_configure_admin(accounts: &mut ConfigureAdmin) -> Result<(), ProgramError> {
     let view = accounts.admin_config.to_account_view();
     let data = view.try_borrow()?;
 
@@ -86,8 +86,7 @@ pub fn handle_configure_admin(accounts: &ConfigureAdmin) -> Result<(), ProgramEr
     drop(data);
 
     // Create or reuse admin_config PDA
-    let (admin_config_pda, bump) =
-        Address::find_program_address(&[b"admin-config"], &crate::ID);
+    let (admin_config_pda, bump) = Address::find_program_address(&[b"admin-config"], &crate::ID);
     if accounts.admin_config.to_account_view().address() != &admin_config_pda {
         return Err(ProgramError::InvalidSeeds);
     }
@@ -101,14 +100,15 @@ pub fn handle_configure_admin(accounts: &ConfigureAdmin) -> Result<(), ProgramEr
             Seed::from(b"admin-config" as &[u8]),
             Seed::from(&bump_bytes as &[u8]),
         ];
-        accounts.system_program
-            .create_account(accounts.admin, &*accounts.admin_config, lamports, size, &crate::ID)
+        accounts
+            .system_program
+            .create_account(&accounts.admin, &accounts.admin_config, lamports, size, &crate::ID)
             .invoke_signed(&seeds)?;
     }
 
     // Write new admin
     let mview = unsafe {
-        &mut *(accounts.admin_config as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.admin_config as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = mview.try_borrow_mut()?;
@@ -125,62 +125,63 @@ pub fn handle_configure_admin(accounts: &ConfigureAdmin) -> Result<(), ProgramEr
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct InitializeExtraAccountMetas<'info> {
+pub struct InitializeExtraAccountMetas {
     #[account(mut)]
-    pub payer: &'info Signer,
-    pub token_mint: &'info UncheckedAccount,
+    pub payer: Signer,
+    pub token_mint: UncheckedAccount,
     #[account(mut)]
-    pub extra_account_metas_list: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub extra_account_metas_list: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &InitializeExtraAccountMetas) -> Result<(), ProgramError> {
-    // 1 extra account: wallet switch PDA seeded by [AccountKey(index=3)] (sender/owner)
-    let meta_list_size: u64 = 51; // 8 + 4 + 4 + 35
-    let lamports = Rent::get()?.try_minimum_balance(meta_list_size as usize)?;
+fn handle_initialize_extra_account_metas_list(
+    accounts: &mut InitializeExtraAccountMetas,
+) -> Result<(), ProgramError> {
+        // 1 extra account: wallet switch PDA seeded by [AccountKey(index=3)] (sender/owner)
+        let meta_list_size: u64 = 51; // 8 + 4 + 4 + 35
+        let lamports = Rent::get()?.try_minimum_balance(meta_list_size as usize)?;
 
-    let mint_address = accounts.token_mint.to_account_view().address();
-    let (expected_pda, bump) = Address::find_program_address(
-        &[b"extra-account-metas", mint_address.as_ref()],
-        &crate::ID,
-    );
-    if accounts.extra_account_metas_list.to_account_view().address() != &expected_pda {
-        return Err(ProgramError::InvalidSeeds);
-    }
+        let mint_address = accounts.token_mint.to_account_view().address();
+        let (expected_pda, bump) = Address::find_program_address(
+            &[b"extra-account-metas", mint_address.as_ref()],
+            &crate::ID,
+        );
+        if accounts.extra_account_metas_list.to_account_view().address() != &expected_pda {
+            return Err(ProgramError::InvalidSeeds);
+        }
 
-    let bump_bytes = [bump];
-    let seeds = [
-        Seed::from(b"extra-account-metas" as &[u8]),
-        Seed::from(mint_address.as_ref()),
-        Seed::from(&bump_bytes as &[u8]),
-    ];
+        let bump_bytes = [bump];
+        let seeds = [
+            Seed::from(b"extra-account-metas" as &[u8]),
+            Seed::from(mint_address.as_ref()),
+            Seed::from(&bump_bytes as &[u8]),
+        ];
 
-    accounts.system_program
-        .create_account(accounts.payer, &*accounts.extra_account_metas_list, lamports, meta_list_size, &crate::ID)
-        .invoke_signed(&seeds)?;
+        accounts.system_program
+            .create_account(&accounts.payer, &accounts.extra_account_metas_list, lamports, meta_list_size, &crate::ID)
+            .invoke_signed(&seeds)?;
 
-    let view = unsafe {
-        &mut *(accounts.extra_account_metas_list as *const UncheckedAccount
-            as *mut UncheckedAccount as *mut AccountView)
-    };
-    let mut data = view.try_borrow_mut()?;
-    data[0..8].copy_from_slice(&EXECUTE_DISCRIMINATOR);
-    data[8..12].copy_from_slice(&39u32.to_le_bytes());
-    data[12..16].copy_from_slice(&1u32.to_le_bytes());
+        let view = unsafe {
+            &mut *(&mut accounts.extra_account_metas_list as *mut UncheckedAccount as *mut AccountView)
+        };
+        let mut data = view.try_borrow_mut()?;
+        data[0..8].copy_from_slice(&EXECUTE_DISCRIMINATOR);
+        data[8..12].copy_from_slice(&39u32.to_le_bytes());
+        data[12..16].copy_from_slice(&1u32.to_le_bytes());
 
-    // ExtraAccountMeta: PDA seeded by [AccountKey(index=3)] — the sender/owner
-    data[16] = 1; // PDA from seeds
-    let mut config = [0u8; 32];
-    config[0] = 1; // 1 seed
-    config[1] = 2; // seed type: account key
-    config[2] = 3; // account index 3 (owner/sender)
-    data[17..49].copy_from_slice(&config);
-    data[49] = 0; // not signer
-    data[50] = 0; // not writable (just reading switch state)
+        // ExtraAccountMeta: PDA seeded by [AccountKey(index=3)] — the sender/owner
+        data[16] = 1; // PDA from seeds
+        let mut config = [0u8; 32];
+        config[0] = 1; // 1 seed
+        config[1] = 2; // seed type: account key
+        config[2] = 3; // account index 3 (owner/sender)
+        data[17..49].copy_from_slice(&config);
+        data[49] = 0; // not signer
+        data[50] = 0; // not writable (just reading switch state)
 
-    log("Extra account metas list initialized");
-    Ok(())
+        log("Extra account metas list initialized");
+        Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -188,18 +189,18 @@ pub fn handle_initialize(accounts: &InitializeExtraAccountMetas) -> Result<(), P
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct Switch<'info> {
+pub struct Switch {
     #[account(mut)]
-    pub admin: &'info Signer,
-    pub wallet: &'info UncheckedAccount,
-    pub admin_config: &'info UncheckedAccount,
+    pub admin: Signer,
+    pub wallet: UncheckedAccount,
+    pub admin_config: UncheckedAccount,
     #[account(mut)]
-    pub wallet_switch: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub wallet_switch: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_switch(accounts: &Switch, on: bool) -> Result<(), ProgramError> {
+fn handle_switch(accounts: &mut Switch, on: bool) -> Result<(), ProgramError> {
     // Verify admin
     let config_view = accounts.admin_config.to_account_view();
     let config_data = config_view.try_borrow()?;
@@ -229,13 +230,14 @@ pub fn handle_switch(accounts: &Switch, on: bool) -> Result<(), ProgramError> {
             Seed::from(wallet_address.as_ref()),
             Seed::from(&switch_bump_bytes as &[u8]),
         ];
-        accounts.system_program
-            .create_account(accounts.admin, &*accounts.wallet_switch, lamports, size, &crate::ID)
+        accounts
+            .system_program
+            .create_account(&accounts.admin, &accounts.wallet_switch, lamports, size, &crate::ID)
             .invoke_signed(&switch_seeds)?;
     }
 
     let mview = unsafe {
-        &mut *(accounts.wallet_switch as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.wallet_switch as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = mview.try_borrow_mut()?;
@@ -251,18 +253,18 @@ pub fn handle_switch(accounts: &Switch, on: bool) -> Result<(), ProgramError> {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct TransferHook<'info> {
-    pub source_token_account: &'info UncheckedAccount,
-    pub token_mint: &'info UncheckedAccount,
-    pub receiver_token_account: &'info UncheckedAccount,
-    pub wallet: &'info UncheckedAccount,
-    pub extra_account_metas_list: &'info UncheckedAccount,
+pub struct TransferHook {
+    pub source_token_account: UncheckedAccount,
+    pub token_mint: UncheckedAccount,
+    pub receiver_token_account: UncheckedAccount,
+    pub wallet: UncheckedAccount,
+    pub extra_account_metas_list: UncheckedAccount,
     /// Wallet switch PDA resolved by Token-2022
-    pub wallet_switch: &'info UncheckedAccount,
+    pub wallet_switch: UncheckedAccount,
 }
 
 #[inline(always)]
-pub fn handle_transfer_hook(accounts: &TransferHook) -> Result<(), ProgramError> {
+fn handle_transfer_hook(accounts: &mut TransferHook) -> Result<(), ProgramError> {
     let switch_view = accounts.wallet_switch.to_account_view();
     let data = switch_view.try_borrow()?;
 

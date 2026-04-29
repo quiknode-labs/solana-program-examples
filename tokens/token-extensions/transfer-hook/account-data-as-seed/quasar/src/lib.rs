@@ -46,21 +46,21 @@ mod quasar_transfer_hook_account_data_as_seed {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct InitializeExtraAccountMetaList<'info> {
+pub struct InitializeExtraAccountMetaList {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     /// ExtraAccountMetaList PDA: ["extra-account-metas", mint]
     #[account(mut)]
-    pub extra_account_meta_list: &'info mut UncheckedAccount,
-    pub mint: &'info UncheckedAccount,
+    pub extra_account_meta_list: UncheckedAccount,
+    pub mint: UncheckedAccount,
     /// Counter PDA: ["counter", payer_key]
     #[account(mut)]
-    pub counter_account: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub counter_account: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize_extra_account_meta_list(accounts: &InitializeExtraAccountMetaList) -> Result<(), ProgramError> {
+pub fn handle_initialize_extra_account_meta_list(accounts: &mut InitializeExtraAccountMetaList) -> Result<(), ProgramError> {
     // ExtraAccountMetaList with 1 extra account.
     // ExtraAccountMeta for a PDA with seeds [Literal("counter"), AccountData(0, 32, 32)]:
     //   The AccountData seed resolves the owner pubkey from account_index=0
@@ -94,8 +94,8 @@ pub fn handle_initialize_extra_account_meta_list(accounts: &InitializeExtraAccou
 
     accounts.system_program
         .create_account(
-            accounts.payer,
-            &*accounts.extra_account_meta_list,
+            &accounts.payer,
+            &accounts.extra_account_meta_list,
             lamports,
             meta_list_size,
             &crate::ID,
@@ -104,7 +104,7 @@ pub fn handle_initialize_extra_account_meta_list(accounts: &InitializeExtraAccou
 
     // Write TLV data
     let view = unsafe {
-        &mut *(accounts.extra_account_meta_list as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.extra_account_meta_list as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = view.try_borrow_mut()?;
@@ -151,8 +151,8 @@ pub fn handle_initialize_extra_account_meta_list(accounts: &InitializeExtraAccou
 
     accounts.system_program
         .create_account(
-            accounts.payer,
-            &*accounts.counter_account,
+            &accounts.payer,
+            &accounts.counter_account,
             counter_lamports,
             counter_size,
             &crate::ID,
@@ -168,21 +168,21 @@ pub fn handle_initialize_extra_account_meta_list(accounts: &InitializeExtraAccou
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct TransferHook<'info> {
-    pub source_token: &'info UncheckedAccount,
-    pub mint: &'info UncheckedAccount,
-    pub destination_token: &'info UncheckedAccount,
-    pub owner: &'info UncheckedAccount,
-    pub extra_account_meta_list: &'info UncheckedAccount,
+pub struct TransferHook {
+    pub source_token: UncheckedAccount,
+    pub mint: UncheckedAccount,
+    pub destination_token: UncheckedAccount,
+    pub owner: UncheckedAccount,
+    pub extra_account_meta_list: UncheckedAccount,
     /// Counter PDA resolved by Token-2022 using account data seeds
     #[account(mut)]
-    pub counter_account: &'info mut UncheckedAccount,
+    pub counter_account: UncheckedAccount,
 }
 
 #[inline(always)]
-pub fn handle_transfer_hook(accounts: &TransferHook) -> Result<(), ProgramError> {
+pub fn handle_transfer_hook(accounts: &mut TransferHook) -> Result<(), ProgramError> {
     let view = unsafe {
-        &mut *(accounts.counter_account as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.counter_account as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = view.try_borrow_mut()?;

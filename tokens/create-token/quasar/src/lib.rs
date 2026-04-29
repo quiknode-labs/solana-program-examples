@@ -33,37 +33,37 @@ mod quasar_create_token {
 /// Accounts for creating a new token mint.
 /// Quasar's `#[account(init)]` handles the create_account + initialize_mint CPI.
 #[derive(Accounts)]
-pub struct CreateToken<'info> {
+pub struct CreateToken {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut, init, payer = payer, mint::decimals = 9, mint::authority = payer)]
-    pub mint: &'info mut Account<Mint>,
-    pub rent: &'info Sysvar<Rent>,
-    pub token_program: &'info Program<Token>,
-    pub system_program: &'info Program<System>,
-}
-
-#[inline(always)]
-pub fn handle_create_token(accounts: &CreateToken) -> Result<(), ProgramError> {
-    // Mint account is created and initialised by Quasar's account init.
-    Ok(())
+    pub mint: Account<Mint>,
+    pub rent: Sysvar<Rent>,
+    pub token_program: Program<Token>,
+    pub system_program: Program<System>,
 }
 
 /// Accounts for minting tokens to an existing token account.
 #[derive(Accounts)]
-pub struct MintTokens<'info> {
+pub struct MintTokens {
     #[account(mut)]
-    pub authority: &'info Signer,
+    pub authority: Signer,
     #[account(mut)]
-    pub mint: &'info mut Account<Mint>,
+    pub mint: Account<Mint>,
     #[account(mut)]
-    pub token_account: &'info mut Account<Token>,
-    pub token_program: &'info Program<Token>,
+    pub token_account: Account<Token>,
+    pub token_program: Program<Token>,
 }
 
 #[inline(always)]
-pub fn handle_mint_tokens(accounts: &mut MintTokens, amount: u64) -> Result<(), ProgramError> {
+fn handle_create_token(_accounts: &mut CreateToken) -> Result<(), ProgramError> {
+    // Mint account is created and initialised by Quasar's account init.
+    Ok(())
+}
+
+#[inline(always)]
+fn handle_mint_tokens(accounts: &mut MintTokens, amount: u64) -> Result<(), ProgramError> {
     accounts.token_program
-        .mint_to(accounts.mint, accounts.token_account, accounts.authority, amount)
+        .mint_to(&accounts.mint, &accounts.token_account, &accounts.authority, amount)
         .invoke()
 }

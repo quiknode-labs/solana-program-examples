@@ -1,7 +1,8 @@
 use quasar_lang::prelude::*;
 
 /// State for the fundraiser: records the maker, target mint, amounts, and timing.
-#[account(discriminator = 1)]
+#[account(discriminator = 1, set_inner)]
+#[seeds(b"fundraiser", maker: Address)]
 pub struct Fundraiser {
     pub maker: Address,
     pub mint_to_raise: Address,
@@ -13,7 +14,7 @@ pub struct Fundraiser {
 }
 
 /// Tracks how much a specific contributor has given.
-#[account(discriminator = 2)]
+#[account(discriminator = 2, set_inner)]
 pub struct Contributor {
     pub amount: u64,
 }

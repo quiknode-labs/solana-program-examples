@@ -35,19 +35,19 @@ mod quasar_cpi_guard {
 }
 
 #[derive(Accounts)]
-pub struct CpiTransfer<'info> {
+pub struct CpiTransfer {
     #[account(mut)]
-    pub sender: &'info Signer,
+    pub sender: Signer,
     #[account(mut)]
-    pub sender_token_account: &'info mut UncheckedAccount,
-    pub mint_account: &'info UncheckedAccount,
+    pub sender_token_account: UncheckedAccount,
+    pub mint_account: UncheckedAccount,
     #[account(mut)]
-    pub recipient_token_account: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub recipient_token_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
 #[inline(always)]
-pub fn handle_cpi_transfer(accounts: &mut CpiTransfer) -> Result<(), ProgramError> {
+fn handle_cpi_transfer(accounts: &mut CpiTransfer) -> Result<(), ProgramError> {
     // TransferChecked: opcode 12, amount=1, decimals=9
     let mut data = [0u8; 10];
     data[0] = 12;

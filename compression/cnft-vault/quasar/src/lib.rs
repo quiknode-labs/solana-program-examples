@@ -33,12 +33,18 @@ mod quasar_cnft_vault {
     /// Withdraw a single compressed NFT from the vault PDA.
     #[instruction(discriminator = 0)]
     pub fn withdraw_cnft(ctx: CtxWithRemaining<Withdraw>) -> Result<(), ProgramError> {
-        instructions::handle_withdraw_cnft(&ctx.accounts, &ctx)
+        let data = ctx.data;
+        let remaining = ctx.remaining_accounts();
+        let leaf_owner_bump = ctx.bumps.leaf_owner;
+        instructions::handle_withdraw_cnft(&mut ctx.accounts, data, remaining, leaf_owner_bump)
     }
 
     /// Withdraw two compressed NFTs from the vault PDA in a single transaction.
     #[instruction(discriminator = 1)]
     pub fn withdraw_two_cnfts(ctx: CtxWithRemaining<WithdrawTwo>) -> Result<(), ProgramError> {
-        instructions::handle_withdraw_two_cnfts(&ctx.accounts, &ctx)
+        let data = ctx.data;
+        let remaining = ctx.remaining_accounts();
+        let leaf_owner_bump = ctx.bumps.leaf_owner;
+        instructions::handle_withdraw_two_cnfts(&mut ctx.accounts, data, remaining, leaf_owner_bump)
     }
 }

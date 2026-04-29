@@ -22,12 +22,12 @@ client = []
 debug = []
 
 [dependencies]
-quasar-lang = "0.0"
+quasar-lang = { git = "https://github.com/blueshift-gg/quasar" }
 # Direct dependency for invoke_signed_with_bounds — needed for raw CPI with
 # variable proof accounts. quasar-lang re-exports types but not the invoke fns.
 solana-instruction-view = { version = "2", features = ["cpi"] }
 solana-instruction = { version = "3.2.0" }
 
 [dev-dependencies]
-quasar-svm = { version = "0.1" }
+quasar-svm = { git = "https://github.com/blueshift-gg/quasar-svm" }
 solana-address = { version = "2.2.0", features = ["decode"] }

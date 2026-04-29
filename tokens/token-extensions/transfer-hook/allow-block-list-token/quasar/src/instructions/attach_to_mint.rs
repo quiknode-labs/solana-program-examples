@@ -6,19 +6,19 @@ use crate::constants::*;
 use crate::instructions::init_mint::Token2022;
 
 #[derive(Accounts)]
-pub struct AttachToMint<'info> {
+pub struct AttachToMint {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub mint: &'info UncheckedAccount,
+    pub mint: UncheckedAccount,
     #[account(mut)]
-    pub extra_metas_account: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
-    pub token_program: &'info Program<Token2022>,
+    pub extra_metas_account: UncheckedAccount,
+    pub system_program: Program<System>,
+    pub token_program: Program<Token2022>,
 }
 
 #[inline(always)]
-pub fn handle_attach_to_mint(accounts: &AttachToMint) -> Result<(), ProgramError> {
+pub fn handle_attach_to_mint(accounts: &mut AttachToMint) -> Result<(), ProgramError> {
     let mint_key = accounts.mint.to_account_view().address();
     let payer_key = accounts.payer.to_account_view().address();
     let token_prog = accounts.token_program.to_account_view().address();
@@ -79,8 +79,8 @@ pub fn handle_attach_to_mint(accounts: &AttachToMint) -> Result<(), ProgramError
 
     accounts.system_program
         .create_account(
-            accounts.payer,
-            &*accounts.extra_metas_account,
+            &accounts.payer,
+            &accounts.extra_metas_account,
             lamports,
             meta_list_size,
             &crate::ID,
@@ -89,7 +89,7 @@ pub fn handle_attach_to_mint(accounts: &AttachToMint) -> Result<(), ProgramError
 
     // Write ExtraAccountMeta TLV data
     let view = unsafe {
-        &mut *(accounts.extra_metas_account as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.extra_metas_account as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = view.try_borrow_mut()?;

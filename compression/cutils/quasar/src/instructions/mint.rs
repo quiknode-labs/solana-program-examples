@@ -13,49 +13,48 @@ const MAX_IX_DATA: usize = 400;
 
 /// Accounts for minting a compressed NFT to a collection.
 #[derive(Accounts)]
-pub struct Mint<'info> {
-    pub payer: &'info Signer,
+pub struct Mint {
+    pub payer: Signer,
     /// Tree authority PDA (seeds checked by Bubblegum).
     #[account(mut)]
-    pub tree_authority: &'info UncheckedAccount,
+    pub tree_authority: UncheckedAccount,
     /// Owner of the newly minted cNFT.
-    pub leaf_owner: &'info UncheckedAccount,
+    pub leaf_owner: UncheckedAccount,
     /// Delegate for the newly minted cNFT.
-    pub leaf_delegate: &'info UncheckedAccount,
+    pub leaf_delegate: UncheckedAccount,
     /// Merkle tree to mint into.
     #[account(mut)]
-    pub merkle_tree: &'info UncheckedAccount,
+    pub merkle_tree: UncheckedAccount,
     /// Tree delegate (must be signer).
-    pub tree_delegate: &'info Signer,
+    pub tree_delegate: Signer,
     /// Collection authority (must be signer).
-    pub collection_authority: &'info Signer,
+    pub collection_authority: Signer,
     /// Collection authority record PDA (or Bubblegum program address).
-    pub collection_authority_record_pda: &'info UncheckedAccount,
+    pub collection_authority_record_pda: UncheckedAccount,
     /// Collection mint account.
-    pub collection_mint: &'info UncheckedAccount,
+    pub collection_mint: UncheckedAccount,
     /// Collection metadata account.
     #[account(mut)]
-    pub collection_metadata: &'info UncheckedAccount,
+    pub collection_metadata: UncheckedAccount,
     /// Edition account for the collection.
-    pub edition_account: &'info UncheckedAccount,
+    pub edition_account: UncheckedAccount,
     /// Bubblegum signer PDA.
-    pub bubblegum_signer: &'info UncheckedAccount,
+    pub bubblegum_signer: UncheckedAccount,
     /// SPL Noop log wrapper.
-    pub log_wrapper: &'info UncheckedAccount,
+    pub log_wrapper: UncheckedAccount,
     /// SPL Account Compression program.
     #[account(address = SPL_ACCOUNT_COMPRESSION_ID)]
-    pub compression_program: &'info UncheckedAccount,
+    pub compression_program: UncheckedAccount,
     /// Token Metadata program.
-    pub token_metadata_program: &'info UncheckedAccount,
+    pub token_metadata_program: UncheckedAccount,
     /// mpl-bubblegum program.
     #[account(address = MPL_BUBBLEGUM_ID)]
-    pub bubblegum_program: &'info UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub bubblegum_program: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
-pub fn handle_mint<'info>(accounts: &Mint<'info>, ctx: &Ctx<'info, Mint<'info>>) -> Result<(), ProgramError> {
+pub fn handle_mint(accounts: &mut Mint, data: &[u8]) -> Result<(), ProgramError> {
     // Parse URI from instruction data: u32 length prefix + utf8 bytes (borsh String)
-    let data = ctx.data;
     if data.len() < 4 {
         return Err(ProgramError::InvalidInstructionData);
     }

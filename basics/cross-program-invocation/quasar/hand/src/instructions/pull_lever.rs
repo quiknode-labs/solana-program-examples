@@ -1,17 +1,14 @@
-use quasar_lang::{
-    cpi::{BufCpiCall, InstructionAccount},
-    prelude::*,
-};
+use quasar_lang::prelude::*;
 
 /// Accounts for the hand program's pull_lever instruction.
 /// The lever_program uses `Program<LeverProgram>` with a custom marker type
 /// that implements `Id` — this lets Quasar verify the program address and
 /// the executable flag during account parsing.
 #[derive(Accounts)]
-pub struct PullLever<'info> {
+pub struct PullLever {
     #[account(mut)]
-    pub power: &'info UncheckedAccount,
-    pub lever_program: &'info Program<crate::LeverProgram>,
+    pub power: UncheckedAccount,
+    pub lever_program: Program<crate::LeverProgram>,
 }
 
 #[inline(always)]
@@ -25,34 +22,22 @@ pub fn handle_pull_lever(accounts: &PullLever, name: &str) -> Result<(), Program
     let name_bytes = name.as_bytes();
     let data_len = 1 + 4 + name_bytes.len();
 
-    // Discriminator = 1 (switch_power)
     data[0] = 1;
 
-    // Name string: u32 little-endian length prefix + bytes
     let len_bytes = (name_bytes.len() as u32).to_le_bytes();
     data[1] = len_bytes[0];
     data[2] = len_bytes[1];
     data[3] = len_bytes[2];
     data[4] = len_bytes[3];
 
-    // Copy name bytes
     let mut i = 0;
     while i < name_bytes.len() {
         data[5 + i] = name_bytes[i];
         i += 1;
     }
 
-    let power_view = accounts.power.to_account_view();
-    let lever_view = accounts.lever_program.to_account_view();
-
-    // Build CPI call with 1 account (power, writable, not a signer).
-    let cpi = BufCpiCall::<1, 128>::new(
-        lever_view.address(),
-        [InstructionAccount::writable(power_view.address())],
-        [power_view],
-        data,
-        data_len,
-    );
-
+    let mut cpi = DynCpiCall::<1, 128>::new(accounts.lever_program.address());
+    cpi.push_account(accounts.power.to_account_view(), false, true)?;
+    cpi.set_data(&data[..data_len])?;
     cpi.invoke()
 }

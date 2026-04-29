@@ -3,16 +3,16 @@ use quasar_spl::{Mint, Token, TokenCpi};
 
 /// Accounts for minting tokens to a recipient's token account.
 #[derive(Accounts)]
-pub struct MintToken<'info> {
+pub struct MintToken {
     #[account(mut)]
-    pub mint_authority: &'info Signer,
-    pub recipient: &'info UncheckedAccount,
+    pub mint_authority: Signer,
+    pub recipient: UncheckedAccount,
     #[account(mut)]
-    pub mint_account: &'info mut Account<Mint>,
+    pub mint_account: Account<Mint>,
     #[account(mut, init_if_needed, payer = mint_authority, token::mint = mint_account, token::authority = recipient)]
-    pub associated_token_account: &'info mut Account<Token>,
-    pub token_program: &'info Program<Token>,
-    pub system_program: &'info Program<System>,
+    pub associated_token_account: Account<Token>,
+    pub token_program: Program<Token>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
@@ -26,9 +26,9 @@ pub fn handle_mint_token(accounts: &mut MintToken, amount: u64) -> Result<(), Pr
 
     accounts.token_program
         .mint_to(
-            accounts.mint_account,
-            accounts.associated_token_account,
-            accounts.mint_authority,
+            &accounts.mint_account,
+            &accounts.associated_token_account,
+            &accounts.mint_authority,
             adjusted_amount,
         )
         .invoke()?;

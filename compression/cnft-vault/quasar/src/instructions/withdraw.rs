@@ -1,5 +1,5 @@
 use crate::*;
-use quasar_lang::cpi::{InstructionAccount, InstructionView, Seed, Signer};
+use quasar_lang::{cpi::{InstructionAccount, InstructionView, Seed, Signer}, remaining::RemainingAccounts};
 
 /// Maximum proof nodes for the merkle tree.
 const MAX_PROOF_NODES: usize = 24;
@@ -12,27 +12,27 @@ const TRANSFER_ARGS_LEN: usize = 108;
 
 /// Accounts for withdrawing a single compressed NFT from the vault.
 #[derive(Accounts)]
-pub struct Withdraw<'info> {
+pub struct Withdraw {
     /// Tree authority PDA (seeds checked by Bubblegum).
     #[account(mut)]
-    pub tree_authority: &'info UncheckedAccount,
+    pub tree_authority: UncheckedAccount,
     /// Vault PDA that owns the cNFT — signs the transfer via invoke_signed.
     #[account(seeds = [b"cNFT-vault"], bump)]
-    pub leaf_owner: &'info UncheckedAccount,
+    pub leaf_owner: UncheckedAccount,
     /// New owner to receive the cNFT.
-    pub new_leaf_owner: &'info UncheckedAccount,
+    pub new_leaf_owner: UncheckedAccount,
     /// Merkle tree account.
     #[account(mut)]
-    pub merkle_tree: &'info UncheckedAccount,
+    pub merkle_tree: UncheckedAccount,
     /// SPL Noop log wrapper.
-    pub log_wrapper: &'info UncheckedAccount,
+    pub log_wrapper: UncheckedAccount,
     /// SPL Account Compression program.
     #[account(address = SPL_ACCOUNT_COMPRESSION_ID)]
-    pub compression_program: &'info UncheckedAccount,
+    pub compression_program: UncheckedAccount,
     /// mpl-bubblegum program.
     #[account(address = MPL_BUBBLEGUM_ID)]
-    pub bubblegum_program: &'info UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub bubblegum_program: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 /// Build mpl-bubblegum Transfer instruction data from raw args.
@@ -43,10 +43,7 @@ fn build_transfer_data(args: &[u8]) -> [u8; 8 + TRANSFER_ARGS_LEN] {
     ix_data
 }
 
-pub fn handle_withdraw_cnft<'info>(
-    accounts: &Withdraw<'info>, ctx: &CtxWithRemaining<'info, Withdraw<'info>>,
-) -> Result<(), ProgramError> {
-    let data = ctx.data;
+pub fn handle_withdraw_cnft(accounts: &mut Withdraw, data: &[u8], remaining: RemainingAccounts<'_>, leaf_owner_bump: u8) -> Result<(), ProgramError> {
     if data.len() < TRANSFER_ARGS_LEN {
         return Err(ProgramError::InvalidInstructionData);
     }
@@ -54,7 +51,6 @@ pub fn handle_withdraw_cnft<'info>(
     let ix_data = build_transfer_data(&data[0..TRANSFER_ARGS_LEN]);
 
     // Collect proof nodes
-    let remaining = ctx.remaining_accounts();
     let placeholder = accounts.system_program.to_account_view().clone();
     let mut proof_views: [AccountView; MAX_PROOF_NODES] =
         core::array::from_fn(|_| placeholder.clone());
@@ -115,7 +111,7 @@ pub fn handle_withdraw_cnft<'info>(
     };
 
     // PDA signer seeds: ["cNFT-vault", bump]
-    let bump_bytes = [ctx.bumps.leaf_owner];
+    let bump_bytes = [leaf_owner_bump];
     let seeds: [Seed; 2] = [
         Seed::from(b"cNFT-vault" as &[u8]),
         Seed::from(&bump_bytes as &[u8]),

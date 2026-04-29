@@ -62,32 +62,30 @@ mod quasar_external_delegate_token_master {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct Initialize {
     #[account(mut, init, payer = authority)]
-    pub user_account: &'info mut Account<UserAccount>,
+    pub user_account: Account<UserAccount>,
     #[account(mut)]
-    pub authority: &'info Signer,
-    pub system_program: &'info Program<System>,
+    pub authority: Signer,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &mut Initialize) -> Result<(), ProgramError> {
+fn handle_initialize(accounts: &mut Initialize) -> Result<(), ProgramError> {
     accounts.user_account
         .set_inner(*accounts.authority.address(), [0u8; 20]);
     Ok(())
 }
 
 #[derive(Accounts)]
-pub struct SetEthereumAddress<'info> {
+pub struct SetEthereumAddress {
     #[account(mut)]
-    pub user_account: &'info mut Account<UserAccount>,
-    pub authority: &'info Signer,
+    pub user_account: Account<UserAccount>,
+    pub authority: Signer,
 }
 
 #[inline(always)]
-pub fn handle_set_ethereum_address(
-    accounts: &mut SetEthereumAddress, ethereum_address: [u8; 20],
-) -> Result<(), ProgramError> {
+fn handle_set_ethereum_address(accounts: &mut SetEthereumAddress, ethereum_address: [u8; 20]) -> Result<(), ProgramError> {
     require_keys_eq!(
         accounts.user_account.authority,
         *accounts.authority.address(),
@@ -98,22 +96,23 @@ pub fn handle_set_ethereum_address(
 }
 
 #[derive(Accounts)]
-pub struct TransferTokens<'info> {
-    pub user_account: &'info Account<UserAccount>,
-    pub authority: &'info Signer,
+pub struct TransferTokens {
+    pub user_account: Account<UserAccount>,
+    pub authority: Signer,
     #[account(mut)]
-    pub user_token_account: &'info mut Account<Token>,
+    pub user_token_account: Account<Token>,
     #[account(mut)]
-    pub recipient_token_account: &'info mut Account<Token>,
+    pub recipient_token_account: Account<Token>,
     /// PDA derived from user_account address.
     #[account(seeds = [user_account], bump)]
-    pub user_pda: &'info UncheckedAccount,
-    pub token_program: &'info Program<Token>,
+    pub user_pda: UncheckedAccount,
+    pub token_program: Program<Token>,
 }
 
 #[inline(always)]
-pub fn handle_transfer_tokens(
-    accounts: &TransferTokens, amount: u64,
+fn handle_transfer_tokens(
+    accounts: &mut TransferTokens,
+    amount: u64,
     signature: &[u8; 65],
     message: &[u8; 32],
     bumps: &TransferTokensBumps,
@@ -134,33 +133,30 @@ pub fn handle_transfer_tokens(
 
     accounts.token_program
         .transfer(
-            accounts.user_token_account,
-            accounts.recipient_token_account,
-            accounts.user_pda,
+            &accounts.user_token_account,
+            &accounts.recipient_token_account,
+            &accounts.user_pda,
             amount,
         )
         .invoke_signed(seeds)
 }
 
 #[derive(Accounts)]
-pub struct AuthorityTransfer<'info> {
-    pub user_account: &'info Account<UserAccount>,
-    pub authority: &'info Signer,
+pub struct AuthorityTransfer {
+    pub user_account: Account<UserAccount>,
+    pub authority: Signer,
     #[account(mut)]
-    pub user_token_account: &'info mut Account<Token>,
+    pub user_token_account: Account<Token>,
     #[account(mut)]
-    pub recipient_token_account: &'info mut Account<Token>,
+    pub recipient_token_account: Account<Token>,
     /// PDA derived from user_account address.
     #[account(seeds = [user_account], bump)]
-    pub user_pda: &'info UncheckedAccount,
-    pub token_program: &'info Program<Token>,
+    pub user_pda: UncheckedAccount,
+    pub token_program: Program<Token>,
 }
 
 #[inline(always)]
-pub fn handle_authority_transfer(
-    accounts: &AuthorityTransfer, amount: u64,
-    bumps: &AuthorityTransferBumps,
-) -> Result<(), ProgramError> {
+fn handle_authority_transfer(accounts: &mut AuthorityTransfer, amount: u64, bumps: &AuthorityTransferBumps) -> Result<(), ProgramError> {
     require_keys_eq!(
         accounts.user_account.authority,
         *accounts.authority.address(),
@@ -175,9 +171,9 @@ pub fn handle_authority_transfer(
 
     accounts.token_program
         .transfer(
-            accounts.user_token_account,
-            accounts.recipient_token_account,
-            accounts.user_pda,
+            &accounts.user_token_account,
+            &accounts.recipient_token_account,
+            &accounts.user_pda,
             amount,
         )
         .invoke_signed(seeds)

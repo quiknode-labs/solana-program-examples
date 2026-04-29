@@ -13,13 +13,14 @@ check-cfg = ['cfg(target_os, values("solana"))']
 crate-type = ["cdylib", "lib"]
 
 [features]
-alloc = ["quasar-lang/alloc"]
+# Removed `alloc` feature — the upstream `quasar-lang` master no longer
+# exposes it, and nothing in this crate depends on alloc.
 client = []
 debug = []
 
 [dependencies]
-quasar-lang = "0.0"
-quasar-spl = "0.0"
+quasar-lang = { git = "https://github.com/blueshift-gg/quasar", branch = "master" }
+quasar-spl = { git = "https://github.com/blueshift-gg/quasar", branch = "master" }
 solana-instruction = { version = "3.2.0" }
 
 [dev-dependencies]

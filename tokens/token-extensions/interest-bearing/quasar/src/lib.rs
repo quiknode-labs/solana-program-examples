@@ -37,25 +37,26 @@ mod quasar_interest_bearing {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct Initialize {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub mint_account: &'info Signer,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub mint_account: Signer,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &Initialize, rate: i16) -> Result<(), ProgramError> {
+fn handle_initialize(accounts: &mut Initialize, rate: i16) -> Result<(), ProgramError> {
     // 165 (base) + 1 (account type) + 4 (TLV header) + 52 (InterestBearingConfig data) = 222 bytes
     let mint_size: u64 = 222;
     let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
 
-    accounts.system_program
+    accounts
+        .system_program
         .create_account(
-            accounts.payer,
-            accounts.mint_account,
+            &accounts.payer,
+            &accounts.mint_account,
             lamports,
             mint_size,
             accounts.token_program.to_account_view().address(),
@@ -100,16 +101,16 @@ pub fn handle_initialize(accounts: &Initialize, rate: i16) -> Result<(), Program
 }
 
 #[derive(Accounts)]
-pub struct UpdateRate<'info> {
+pub struct UpdateRate {
     #[account(mut)]
-    pub authority: &'info Signer,
+    pub authority: Signer,
     #[account(mut)]
-    pub mint_account: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub mint_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
 #[inline(always)]
-pub fn handle_update_rate(accounts: &UpdateRate, rate: i16) -> Result<(), ProgramError> {
+fn handle_update_rate(accounts: &mut UpdateRate, rate: i16) -> Result<(), ProgramError> {
     // InterestBearingMintUpdateRate: opcode 33, sub-opcode 1, rate (i16 LE)
     let mut data = [0u8; 4];
     data[0] = 33;

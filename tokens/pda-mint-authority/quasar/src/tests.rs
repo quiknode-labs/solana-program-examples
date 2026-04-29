@@ -75,16 +75,16 @@ fn test_create_mint() {
     let (mint_pda, _) = Pubkey::find_program_address(&[b"mint"], &crate::ID);
     let token_program = quasar_svm::SPL_TOKEN_PROGRAM_ID;
     let system_program = quasar_svm::system_program::ID;
-    let rent = quasar_svm::solana_sdk_ids::sysvar::rent::ID;
 
     let data = build_create_mint_data(9);
 
+    // Account order matches the `CreateMint` Accounts struct:
+    // payer, mint, token_program, system_program.
     let instruction = Instruction {
         program_id: crate::ID,
         accounts: vec![
             solana_instruction::AccountMeta::new(payer.into(), true),
             solana_instruction::AccountMeta::new(mint_pda.into(), false),
-            solana_instruction::AccountMeta::new_readonly(rent.into(), false),
             solana_instruction::AccountMeta::new_readonly(token_program.into(), false),
             solana_instruction::AccountMeta::new_readonly(system_program.into(), false),
         ],

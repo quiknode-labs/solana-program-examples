@@ -1,4 +1,4 @@
-use quasar_lang::cpi::{BufCpiCall, CpiCall, InstructionAccount, Seed};
+use quasar_lang::cpi::{CpiCall, DynCpiCall, InstructionAccount, Seed};
 use quasar_lang::prelude::*;
 use quasar_lang::sysvars::Sysvar;
 
@@ -15,22 +15,22 @@ impl Id for Token2022 {
 }
 
 #[derive(Accounts)]
-pub struct InitMint<'info> {
+pub struct InitMint {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     /// The mint account (must also be a signer for create_account).
     #[account(mut)]
-    pub mint: &'info Signer,
+    pub mint: Signer,
     /// ExtraAccountMetaList PDA: ["extra-account-metas", mint]
     #[account(mut)]
-    pub extra_metas_account: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
-    pub token_program: &'info Program<Token2022>,
+    pub extra_metas_account: UncheckedAccount,
+    pub system_program: Program<System>,
+    pub token_program: Program<Token2022>,
 }
 
 #[inline(always)]
 pub fn handle_init_mint(
-    accounts: &InitMint, decimals: u8,
+    accounts: &mut InitMint, decimals: u8,
     freeze_authority: &Address,
     permanent_delegate: &Address,
     transfer_hook_authority: &Address,
@@ -70,7 +70,8 @@ pub fn handle_init_mint(
 
     // Create the mint account owned by Token2022.
     accounts.system_program
-        .create_account(accounts.payer, accounts.mint, lamports, mint_size as u64, token_prog)
+        .create_account(
+            &accounts.payer, &accounts.mint, lamports, mint_size as u64, token_prog)
         .invoke()?;
 
     // Initialize PermanentDelegate extension: opcode 35
@@ -157,22 +158,15 @@ pub fn handle_init_mint(
     buf[pos..pos + uri.len()].copy_from_slice(uri);
     pos += uri.len();
 
-    BufCpiCall::new(
-        token_prog,
-        [
-            InstructionAccount::writable(mint_key),
-            InstructionAccount::readonly_signer(payer_key),
-            InstructionAccount::readonly_signer(payer_key),
-        ],
-        [
-            accounts.mint.to_account_view(),
-            accounts.payer.to_account_view(),
-            accounts.payer.to_account_view(),
-        ],
-        buf,
-        pos,
-    )
-    .invoke()?;
+    {
+        let mut cpi = DynCpiCall::<3, MAX_META_IX>::new(token_prog);
+        cpi.push_account(accounts.mint.to_account_view(), false, true)?;
+        cpi.push_account(accounts.payer.to_account_view(), true, false)?;
+        cpi.push_account(accounts.payer.to_account_view(), true, false)?;
+        cpi.set_data(&buf[..pos])?;
+        cpi.invoke()?;
+    }
+    let _ = mint_key;
 
     // TokenMetadataUpdateField for "AB" key: opcode 44, sub-opcode 1
     emit_update_field_cpi(accounts, b"AB", mode_value)?;
@@ -197,7 +191,7 @@ pub fn handle_init_mint(
 /// Emit a Token-2022 TokenMetadataUpdateField CPI.
 /// Opcode 44, sub-opcode 1, followed by Field::Key (discriminator 2, then borsh
 /// string for key, then borsh string for value).
-fn emit_update_field_cpi(ctx: &InitMint<'_>, key: &[u8], value: &[u8]) -> Result<(), ProgramError> {
+fn emit_update_field_cpi(ctx: &InitMint, key: &[u8], value: &[u8]) -> Result<(), ProgramError> {
     let token_prog = ctx.token_program.to_account_view().address();
     let mint_key = ctx.mint.to_account_view().address();
     let payer_key = ctx.payer.to_account_view().address();
@@ -221,25 +215,17 @@ fn emit_update_field_cpi(ctx: &InitMint<'_>, key: &[u8], value: &[u8]) -> Result
     buf[pos..pos + value.len()].copy_from_slice(value);
     pos += value.len();
 
-    BufCpiCall::new(
-        token_prog,
-        [
-            InstructionAccount::writable(mint_key),
-            InstructionAccount::readonly_signer(payer_key),
-        ],
-        [
-            ctx.mint.to_account_view(),
-            ctx.payer.to_account_view(),
-        ],
-        buf,
-        pos,
-    )
-    .invoke()
+    let _ = (mint_key, payer_key);
+    let mut cpi = DynCpiCall::<2, MAX_META_IX>::new(token_prog);
+    cpi.push_account(ctx.mint.to_account_view(), false, true)?;
+    cpi.push_account(ctx.payer.to_account_view(), true, false)?;
+    cpi.set_data(&buf[..pos])?;
+    cpi.invoke()
 }
 
 /// Top up the mint account if its balance is below the rent minimum for its
 /// current data size.
-fn top_up_rent(ctx: &InitMint<'_>) -> Result<(), ProgramError> {
+fn top_up_rent(ctx: &InitMint) -> Result<(), ProgramError> {
     let mint_view = ctx.mint.to_account_view();
     let data_len = mint_view.data_len();
     let min_balance = Rent::get()?.try_minimum_balance(data_len)?;
@@ -248,7 +234,7 @@ fn top_up_rent(ctx: &InitMint<'_>) -> Result<(), ProgramError> {
     if min_balance > current_lamports {
         let diff = min_balance - current_lamports;
         ctx.system_program
-            .transfer(ctx.payer, ctx.mint, diff)
+            .transfer(&ctx.payer, &ctx.mint, diff)
             .invoke()?;
     }
     Ok(())
@@ -256,7 +242,7 @@ fn top_up_rent(ctx: &InitMint<'_>) -> Result<(), ProgramError> {
 
 /// Create the ExtraAccountMetaList PDA and populate it with the ABWallet
 /// extra account meta (PDA seeded by [AB_WALLET_SEED, AccountData(2, 32, 32)]).
-fn init_extra_metas(ctx: &InitMint<'_>) -> Result<(), ProgramError> {
+fn init_extra_metas(ctx: &mut InitMint) -> Result<(), ProgramError> {
     let mint_key = ctx.mint.to_account_view().address();
 
     // Meta list with 1 extra account = 51 bytes
@@ -279,11 +265,12 @@ fn init_extra_metas(ctx: &InitMint<'_>) -> Result<(), ProgramError> {
     ];
 
     ctx.system_program
-        .create_account(ctx.payer, &*ctx.extra_metas_account, lamports, meta_list_size, &crate::ID)
+        .create_account(
+            &ctx.payer, &ctx.extra_metas_account, lamports, meta_list_size, &crate::ID)
         .invoke_signed(&seeds)?;
 
     let view = unsafe {
-        &mut *(ctx.extra_metas_account as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut ctx.extra_metas_account as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = view.try_borrow_mut()?;

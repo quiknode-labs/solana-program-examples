@@ -30,35 +30,36 @@ mod quasar_nft_minter {
 
 /// All accounts needed to mint an NFT in one transaction.
 #[derive(Accounts)]
-pub struct MintNft<'info> {
+pub struct MintNft {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
 
     /// Metadata PDA — initialised by the Metaplex program.
     #[account(mut)]
-    pub metadata_account: &'info UncheckedAccount,
+    pub metadata_account: UncheckedAccount,
 
     /// Master edition PDA — initialised by the Metaplex program.
     #[account(mut)]
-    pub edition_account: &'info UncheckedAccount,
+    pub edition_account: UncheckedAccount,
 
     /// NFT mint (decimals = 0).
     #[account(mut, init, payer = payer, mint::decimals = 0, mint::authority = payer, mint::freeze_authority = payer)]
-    pub mint_account: &'info mut Account<Mint>,
+    pub mint_account: Account<Mint>,
 
     /// Token account holding the NFT.
     #[account(mut, init_if_needed, payer = payer, token::mint = mint_account, token::authority = payer)]
-    pub associated_token_account: &'info mut Account<Token>,
+    pub associated_token_account: Account<Token>,
 
-    pub token_program: &'info Program<Token>,
-    pub token_metadata_program: &'info MetadataProgram,
-    pub system_program: &'info Program<System>,
-    pub rent: &'info Sysvar<Rent>,
+    pub token_program: Program<Token>,
+    pub token_metadata_program: MetadataProgram,
+    pub system_program: Program<System>,
+    pub rent: Sysvar<Rent>,
 }
 
 #[inline(always)]
-pub fn handle_mint_nft(
-    accounts: &MintNft, nft_name: &str,
+fn handle_mint_nft(
+    accounts: &mut MintNft,
+    nft_name: &str,
     nft_symbol: &str,
     nft_uri: &str,
 ) -> Result<(), ProgramError> {
@@ -66,9 +67,9 @@ pub fn handle_mint_nft(
     log("Minting token");
     accounts.token_program
         .mint_to(
-            accounts.mint_account,
-            accounts.associated_token_account,
-            accounts.payer,
+            &accounts.mint_account,
+            &accounts.associated_token_account,
+            &accounts.payer,
             1u64,
         )
         .invoke()?;
@@ -77,13 +78,13 @@ pub fn handle_mint_nft(
     log("Creating metadata account");
     accounts.token_metadata_program
         .create_metadata_accounts_v3(
-            accounts.metadata_account,
-            accounts.mint_account,
-            accounts.payer,
-            accounts.payer,
-            accounts.payer,
-            accounts.system_program,
-            accounts.rent,
+            &accounts.metadata_account,
+            &accounts.mint_account,
+            &accounts.payer,
+            &accounts.payer,
+            &accounts.payer,
+            &accounts.system_program,
+            &accounts.rent,
             nft_name,
             nft_symbol,
             nft_uri,
@@ -97,15 +98,15 @@ pub fn handle_mint_nft(
     log("Creating master edition account");
     accounts.token_metadata_program
         .create_master_edition_v3(
-            accounts.edition_account,
-            accounts.mint_account,
-            accounts.payer, // update_authority
-            accounts.payer, // mint_authority
-            accounts.payer, // payer
-            accounts.metadata_account,
-            accounts.token_program,
-            accounts.system_program,
-            accounts.rent,
+            &accounts.edition_account,
+            &accounts.mint_account,
+            &accounts.payer, // update_authority
+            &accounts.payer, // mint_authority
+            &accounts.payer, // payer
+            &accounts.metadata_account,
+            &accounts.token_program,
+            &accounts.system_program,
+            &accounts.rent,
             None, // max_supply = unlimited
         )
         .invoke()?;

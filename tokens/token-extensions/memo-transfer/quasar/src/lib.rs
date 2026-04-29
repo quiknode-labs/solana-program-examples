@@ -37,26 +37,27 @@ mod quasar_memo_transfer {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct Initialize {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub token_account: &'info Signer,
-    pub mint_account: &'info UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub token_account: Signer,
+    pub mint_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
+fn handle_initialize(accounts: &mut Initialize) -> Result<(), ProgramError> {
     // Token account + MemoTransfer extension = 300 bytes
     let account_size: u64 = 300;
     let lamports = Rent::get()?.try_minimum_balance(account_size as usize)?;
 
-    accounts.system_program
+    accounts
+        .system_program
         .create_account(
-            accounts.payer,
-            accounts.token_account,
+            &accounts.payer,
+            &accounts.token_account,
             lamports,
             account_size,
             accounts.token_program.to_account_view().address(),
@@ -99,16 +100,16 @@ pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
 }
 
 #[derive(Accounts)]
-pub struct Disable<'info> {
+pub struct Disable {
     #[account(mut)]
-    pub owner: &'info Signer,
+    pub owner: Signer,
     #[account(mut)]
-    pub token_account: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub token_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
 #[inline(always)]
-pub fn handle_disable(accounts: &Disable) -> Result<(), ProgramError> {
+fn handle_disable(accounts: &mut Disable) -> Result<(), ProgramError> {
     // MemoTransfer disable: opcode 30, sub-opcode 1
     CpiCall::new(
         accounts.token_program.to_account_view().address(),

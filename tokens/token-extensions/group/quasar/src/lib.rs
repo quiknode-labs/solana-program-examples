@@ -31,30 +31,31 @@ mod quasar_group {
 
     #[instruction(discriminator = 0)]
     pub fn initialize_group(ctx: Ctx<InitializeGroup>) -> Result<(), ProgramError> {
-        handle_initialize(&mut ctx.accounts)
+        handle_initialize_group(&mut ctx.accounts)
     }
 }
 
 #[derive(Accounts)]
-pub struct InitializeGroup<'info> {
+pub struct InitializeGroup {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub mint_account: &'info Signer,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub mint_account: Signer,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &InitializeGroup) -> Result<(), ProgramError> {
+fn handle_initialize_group(accounts: &mut InitializeGroup) -> Result<(), ProgramError> {
     // Mint + GroupPointer extension = 250 bytes
     let mint_size: u64 = 250;
     let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
 
-    accounts.system_program
+    accounts
+        .system_program
         .create_account(
-            accounts.payer,
-            accounts.mint_account,
+            &accounts.payer,
+            &accounts.mint_account,
             lamports,
             mint_size,
             accounts.token_program.to_account_view().address(),

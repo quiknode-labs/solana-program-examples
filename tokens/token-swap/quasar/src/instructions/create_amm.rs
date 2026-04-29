@@ -6,14 +6,14 @@ use {crate::state::Amm, quasar_lang::prelude::*};
 /// In Quasar, we use a simpler fixed seed `["amm"]` since the Quasar derive
 /// macro seeds reference account addresses, not instruction data.
 #[derive(Accounts)]
-pub struct CreateAmm<'info> {
+pub struct CreateAmm {
     #[account(mut, init, payer = payer, seeds = [b"amm"], bump)]
-    pub amm: &'info mut Account<Amm>,
+    pub amm: Account<Amm>,
     /// Admin authority for the AMM.
-    pub admin: &'info UncheckedAccount,
+    pub admin: UncheckedAccount,
     #[account(mut)]
-    pub payer: &'info Signer,
-    pub system_program: &'info Program<System>,
+    pub payer: Signer,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]

@@ -15,7 +15,7 @@ pub fn get_on_ride(
 
     let mut i = 0;
     while i < rides.len() {
-        if rides[i].name_matches(ride_name) {
+        if ride::ride_name_matches(&rides[i], ride_name) {
             log("You're about to go on a ride!");
 
             if ticket_count < rides[i].tickets {

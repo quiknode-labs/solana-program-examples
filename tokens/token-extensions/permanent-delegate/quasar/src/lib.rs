@@ -32,25 +32,26 @@ mod quasar_permanent_delegate {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct Initialize {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub mint_account: &'info Signer,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub mint_account: Signer,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
+fn handle_initialize(accounts: &mut Initialize) -> Result<(), ProgramError> {
     // 165 (base) + 1 (account type) + 4 (TLV header) + 32 (PermanentDelegate data) = 202 bytes
     let mint_size: u64 = 202;
     let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
 
-    accounts.system_program
+    accounts
+        .system_program
         .create_account(
-            accounts.payer,
-            accounts.mint_account,
+            &accounts.payer,
+            &accounts.mint_account,
             lamports,
             mint_size,
             accounts.token_program.to_account_view().address(),

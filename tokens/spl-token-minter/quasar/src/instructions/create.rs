@@ -9,9 +9,9 @@ use quasar_spl::{
 /// The mint is initialised via Quasar's `#[account(init)]`. The metadata
 /// PDA is created by CPI-ing into the Metaplex Token Metadata program.
 #[derive(Accounts)]
-pub struct CreateToken<'info> {
+pub struct CreateToken {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(
         mut,
         init,
@@ -20,19 +20,20 @@ pub struct CreateToken<'info> {
         mint::authority = payer,
         mint::freeze_authority = payer,
     )]
-    pub mint_account: &'info mut Account<Mint>,
+    pub mint_account: Account<Mint>,
     /// The metadata PDA — will be initialised by the Metaplex program.
     #[account(mut)]
-    pub metadata_account: &'info UncheckedAccount,
-    pub token_program: &'info Program<Token>,
-    pub token_metadata_program: &'info MetadataProgram,
-    pub system_program: &'info Program<System>,
-    pub rent: &'info Sysvar<Rent>,
+    pub metadata_account: UncheckedAccount,
+    pub token_program: Program<Token>,
+    pub token_metadata_program: MetadataProgram,
+    pub system_program: Program<System>,
+    pub rent: Sysvar<Rent>,
 }
 
 #[inline(always)]
 pub fn handle_create_token(
-    accounts: &CreateToken, token_name: &str,
+    accounts: &mut CreateToken,
+    token_name: &str,
     token_symbol: &str,
     token_uri: &str,
 ) -> Result<(), ProgramError> {
@@ -40,13 +41,13 @@ pub fn handle_create_token(
 
     accounts.token_metadata_program
         .create_metadata_accounts_v3(
-            accounts.metadata_account,
-            accounts.mint_account,
-            accounts.payer, // mint_authority
-            accounts.payer, // payer
-            accounts.payer, // update_authority
-            accounts.system_program,
-            accounts.rent,
+            &accounts.metadata_account,
+            &accounts.mint_account,
+            &accounts.payer, // mint_authority
+            &accounts.payer, // payer
+            &accounts.payer, // update_authority
+            &accounts.system_program,
+            &accounts.rent,
             token_name,
             token_symbol,
             token_uri,

@@ -7,18 +7,18 @@ use crate::errors;
 use crate::state::{read_config_authority, write_ab_wallet, AB_WALLET_SIZE, CONFIG_SIZE};
 
 #[derive(Accounts)]
-pub struct InitWallet<'info> {
+pub struct InitWallet {
     #[account(mut)]
-    pub authority: &'info Signer,
-    pub config: &'info UncheckedAccount,
-    pub wallet: &'info UncheckedAccount,
+    pub authority: Signer,
+    pub config: UncheckedAccount,
+    pub wallet: UncheckedAccount,
     #[account(mut)]
-    pub ab_wallet: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub ab_wallet: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_init_wallet(accounts: &InitWallet, allowed: bool) -> Result<(), ProgramError> {
+pub fn handle_init_wallet(accounts: &mut InitWallet, allowed: bool) -> Result<(), ProgramError> {
     // Verify config PDA
     let (config_pda, _) = Address::find_program_address(&[CONFIG_SEED], &crate::ID);
     if accounts.config.to_account_view().address() != &config_pda {
@@ -57,8 +57,8 @@ pub fn handle_init_wallet(accounts: &InitWallet, allowed: bool) -> Result<(), Pr
 
     accounts.system_program
         .create_account(
-            accounts.authority,
-            &*accounts.ab_wallet,
+            &accounts.authority,
+            &accounts.ab_wallet,
             lamports,
             AB_WALLET_SIZE,
             &crate::ID,
@@ -67,7 +67,7 @@ pub fn handle_init_wallet(accounts: &InitWallet, allowed: bool) -> Result<(), Pr
 
     // Write wallet data
     let view = unsafe {
-        &mut *(accounts.ab_wallet as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.ab_wallet as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = view.try_borrow_mut()?;

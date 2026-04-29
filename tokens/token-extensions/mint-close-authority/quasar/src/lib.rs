@@ -39,25 +39,26 @@ mod quasar_mint_close_authority {
 }
 
 #[derive(Accounts)]
-pub struct Initialize<'info> {
+pub struct Initialize {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub mint_account: &'info Signer,
-    pub token_program: &'info Program<Token2022Program>,
-    pub system_program: &'info Program<System>,
+    pub mint_account: Signer,
+    pub token_program: Program<Token2022Program>,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
+fn handle_initialize(accounts: &mut Initialize) -> Result<(), ProgramError> {
     // 165 (base) + 1 (account type) + 4 (TLV header) + 32 (MintCloseAuthority data) = 202 bytes
     let mint_size: u64 = 202;
     let lamports = Rent::get()?.try_minimum_balance(mint_size as usize)?;
 
-    accounts.system_program
+    accounts
+        .system_program
         .create_account(
-            accounts.payer,
-            accounts.mint_account,
+            &accounts.payer,
+            &accounts.mint_account,
             lamports,
             mint_size,
             accounts.token_program.to_account_view().address(),
@@ -67,7 +68,7 @@ pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
     // InitializeMintCloseAuthority: opcode 25, COption::Some flag (1 byte), close_authority pubkey (32 bytes)
     let mut ext_data = [0u8; 34];
     ext_data[0] = 25; // InitializeMintCloseAuthority
-    ext_data[1] = 1;  // COption::Some
+    ext_data[1] = 1; // COption::Some
     ext_data[2..34].copy_from_slice(accounts.payer.to_account_view().address().as_ref());
 
     CpiCall::new(
@@ -99,16 +100,16 @@ pub fn handle_initialize(accounts: &Initialize) -> Result<(), ProgramError> {
 }
 
 #[derive(Accounts)]
-pub struct Close<'info> {
+pub struct Close {
     #[account(mut)]
-    pub authority: &'info Signer,
+    pub authority: Signer,
     #[account(mut)]
-    pub mint_account: &'info mut UncheckedAccount,
-    pub token_program: &'info Program<Token2022Program>,
+    pub mint_account: UncheckedAccount,
+    pub token_program: Program<Token2022Program>,
 }
 
 #[inline(always)]
-pub fn handle_close(accounts: &Close) -> Result<(), ProgramError> {
+fn handle_close(accounts: &mut Close) -> Result<(), ProgramError> {
     // CloseAccount: opcode 9
     CpiCall::new(
         accounts.token_program.to_account_view().address(),

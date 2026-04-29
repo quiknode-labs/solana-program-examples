@@ -20,20 +20,25 @@ fn empty(address: Pubkey) -> Account {
     }
 }
 
-/// Build initialize instruction data.
-/// Wire format: [disc=0] [message: u32 prefix + bytes]
+/// Build initialize instruction data using Quasar's compact wire format.
+/// `String<1024>` defaults to a u8 length prefix (the second `String` generic
+/// argument is the prefix type and its default is `u8`).
+///
+///   header: [disc: u8 = 0][message_len: u8]
+///   tail:   [message bytes]
 fn build_initialize(message: &str) -> Vec<u8> {
-    let mut data = vec![0u8]; // discriminator = 0
-    data.extend_from_slice(&(message.len() as u32).to_le_bytes());
+    let mut data = Vec::with_capacity(2 + message.len());
+    data.push(0u8); // discriminator
+    data.push(message.len() as u8);
     data.extend_from_slice(message.as_bytes());
     data
 }
 
-/// Build update instruction data.
-/// Wire format: [disc=1] [message: u32 prefix + bytes]
+/// Build update instruction data using the same compact wire format.
 fn build_update(message: &str) -> Vec<u8> {
-    let mut data = vec![1u8]; // discriminator = 1
-    data.extend_from_slice(&(message.len() as u32).to_le_bytes());
+    let mut data = Vec::with_capacity(2 + message.len());
+    data.push(1u8); // discriminator
+    data.push(message.len() as u8);
     data.extend_from_slice(message.as_bytes());
     data
 }
@@ -65,14 +70,13 @@ fn test_initialize() {
     let result = svm.process_instruction(&ix, &[signer(payer), empty(message_account)]);
     result.assert_success();
 
-    // Verify: disc(1) + message (u32 prefix "Hello, World!")
+    // Verify: disc(1) + message (u8 prefix + bytes)
     let account = result.account(&message_account).unwrap();
     assert_eq!(account.data[0], 1, "discriminator");
 
-    // Default String uses u32 prefix, max 1024
-    let msg_len = u32::from_le_bytes(account.data[1..5].try_into().unwrap()) as usize;
+    let msg_len = account.data[1] as usize;
     assert_eq!(msg_len, 13);
-    assert_eq!(&account.data[5..5 + msg_len], b"Hello, World!");
+    assert_eq!(&account.data[2..2 + msg_len], b"Hello, World!");
 }
 
 #[test]

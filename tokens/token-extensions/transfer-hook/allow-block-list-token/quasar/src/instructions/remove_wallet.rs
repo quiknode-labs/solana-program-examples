@@ -5,16 +5,16 @@ use crate::errors;
 use crate::state::{read_config_authority, CONFIG_SIZE};
 
 #[derive(Accounts)]
-pub struct RemoveWallet<'info> {
+pub struct RemoveWallet {
     #[account(mut)]
-    pub authority: &'info Signer,
-    pub config: &'info UncheckedAccount,
+    pub authority: Signer,
+    pub config: UncheckedAccount,
     #[account(mut)]
-    pub ab_wallet: &'info mut UncheckedAccount,
+    pub ab_wallet: UncheckedAccount,
 }
 
 #[inline(always)]
-pub fn handle_remove_wallet(accounts: &RemoveWallet) -> Result<(), ProgramError> {
+pub fn handle_remove_wallet(accounts: &mut RemoveWallet) -> Result<(), ProgramError> {
     // Verify config PDA
     let (config_pda, _) = Address::find_program_address(&[CONFIG_SEED], &crate::ID);
     if accounts.config.to_account_view().address() != &config_pda {
@@ -44,7 +44,7 @@ pub fn handle_remove_wallet(accounts: &RemoveWallet) -> Result<(), ProgramError>
 
     // Zero the account data
     let mview = unsafe {
-        &mut *(accounts.ab_wallet as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.ab_wallet as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = mview.try_borrow_mut()?;

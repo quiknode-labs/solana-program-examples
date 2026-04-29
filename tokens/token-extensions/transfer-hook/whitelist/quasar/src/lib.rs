@@ -49,20 +49,20 @@ mod quasar_transfer_hook_whitelist {
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct InitializeExtraAccountMetaList<'info> {
+pub struct InitializeExtraAccountMetaList {
     #[account(mut)]
-    pub payer: &'info Signer,
+    pub payer: Signer,
     #[account(mut)]
-    pub extra_account_meta_list: &'info mut UncheckedAccount,
-    pub mint: &'info UncheckedAccount,
+    pub extra_account_meta_list: UncheckedAccount,
+    pub mint: UncheckedAccount,
     /// Whitelist PDA: ["white_list"]
     #[account(mut)]
-    pub white_list: &'info mut UncheckedAccount,
-    pub system_program: &'info Program<System>,
+    pub white_list: UncheckedAccount,
+    pub system_program: Program<System>,
 }
 
 #[inline(always)]
-pub fn handle_initialize(accounts: &InitializeExtraAccountMetaList) -> Result<(), ProgramError> {
+pub fn handle_initialize(accounts: &mut InitializeExtraAccountMetaList) -> Result<(), ProgramError> {
     // Create ExtraAccountMetaList PDA (1 extra account: whitelist)
     let meta_list_size: u64 = 51; // 8 + 4 + 4 + 35
     let lamports = Rent::get()?.try_minimum_balance(meta_list_size as usize)?;
@@ -85,13 +85,12 @@ pub fn handle_initialize(accounts: &InitializeExtraAccountMetaList) -> Result<()
     ];
 
     accounts.system_program
-        .create_account(accounts.payer, &*accounts.extra_account_meta_list, lamports, meta_list_size, &crate::ID)
+        .create_account(&accounts.payer, &accounts.extra_account_meta_list, lamports, meta_list_size, &crate::ID)
         .invoke_signed(&seeds)?;
 
     // Write TLV data
     let view = unsafe {
-        &mut *(accounts.extra_account_meta_list as *const UncheckedAccount
-            as *mut UncheckedAccount as *mut AccountView)
+        &mut *(&mut accounts.extra_account_meta_list as *mut UncheckedAccount as *mut AccountView)
     };
     let mut data = view.try_borrow_mut()?;
     data[0..8].copy_from_slice(&EXECUTE_DISCRIMINATOR);
@@ -127,12 +126,12 @@ pub fn handle_initialize(accounts: &InitializeExtraAccountMetaList) -> Result<()
     ];
 
     accounts.system_program
-        .create_account(accounts.payer, &*accounts.white_list, wl_lamports, wl_size, &crate::ID)
+        .create_account(&accounts.payer, &accounts.white_list, wl_lamports, wl_size, &crate::ID)
         .invoke_signed(&wl_seeds)?;
 
     // Write authority (payer) to whitelist account
     let wl_view = unsafe {
-        &mut *(accounts.white_list as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.white_list as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut wl_data = wl_view.try_borrow_mut()?;
@@ -148,13 +147,13 @@ pub fn handle_initialize(accounts: &InitializeExtraAccountMetaList) -> Result<()
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct TransferHook<'info> {
-    pub source_token: &'info UncheckedAccount,
-    pub mint: &'info UncheckedAccount,
-    pub destination_token: &'info UncheckedAccount,
-    pub owner: &'info UncheckedAccount,
-    pub extra_account_meta_list: &'info UncheckedAccount,
-    pub white_list: &'info UncheckedAccount,
+pub struct TransferHook {
+    pub source_token: UncheckedAccount,
+    pub mint: UncheckedAccount,
+    pub destination_token: UncheckedAccount,
+    pub owner: UncheckedAccount,
+    pub extra_account_meta_list: UncheckedAccount,
+    pub white_list: UncheckedAccount,
 }
 
 #[inline(always)]
@@ -199,17 +198,17 @@ pub fn handle_transfer_hook(accounts: &TransferHook) -> Result<(), ProgramError>
 // ---------------------------------------------------------------------------
 
 #[derive(Accounts)]
-pub struct AddToWhitelist<'info> {
-    pub signer: &'info Signer,
-    pub new_account: &'info UncheckedAccount,
+pub struct AddToWhitelist {
+    pub signer: Signer,
+    pub new_account: UncheckedAccount,
     #[account(mut)]
-    pub white_list: &'info mut UncheckedAccount,
+    pub white_list: UncheckedAccount,
 }
 
 #[inline(always)]
-pub fn handle_add_to_whitelist(accounts: &AddToWhitelist) -> Result<(), ProgramError> {
+pub fn handle_add_to_whitelist(accounts: &mut AddToWhitelist) -> Result<(), ProgramError> {
     let view = unsafe {
-        &mut *(accounts.white_list as *const UncheckedAccount as *mut UncheckedAccount
+        &mut *(&mut accounts.white_list as *mut UncheckedAccount
             as *mut AccountView)
     };
     let mut data = view.try_borrow_mut()?;
