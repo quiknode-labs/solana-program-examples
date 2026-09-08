@@ -4,6 +4,22 @@ All notable changes to this repository are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026-09-08] - CI: retry the Solana CLI install; main's runs no longer cancel each other
+
+The Anchor v1 run on `main` after the 1.2.0 merge went red without any code being
+at fault. One matrix group's Solana CLI install failed because the release
+tarball it downloaded from release.anza.xyz arrived truncated ("failed to iterate
+over archive"); the same step passed in the other thirteen groups. The next merge,
+a README-only change, then cancelled that run through the workflow's concurrency
+rule before it could finish, and skipped its own build groups, so `main` was left
+with no verdict.
+
+- The "Install Solana CLI" step in `anchor.yml` and `anchor-v1.yml` retries the
+  installer up to five times, wiping the partial install between attempts.
+- `cancel-in-progress` in every workflow with a concurrency group now applies only
+  off `main`. A superseded run on a pull request branch is still cancelled; runs on
+  `main` finish, so a docs-only merge can no longer erase the previous merge's result.
+
 ## [2026-09-08] - Anchor v1 examples on Anchor 1.2.0
 
 Anchor 1.2.0 is the current release of the v1 line. Every `anchor-v1/` example now

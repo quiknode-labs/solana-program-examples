@@ -36,7 +36,11 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded runs on a pull request branch are cancelled. Runs on main are
+  # not: a later push whose change detection skips the build (a docs-only
+  # merge) would otherwise cancel the run verifying the previous merge and
+  # leave main with no verdict.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   # See https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
