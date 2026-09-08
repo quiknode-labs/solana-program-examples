@@ -21,7 +21,11 @@ pub mod betting_market {
         default_fee_bps: u16,
         fee_recipient: Address,
     ) -> Result<()> {
-        instructions::initialize_config::handle_initialize_config(context, default_fee_bps, fee_recipient)
+        instructions::initialize_config::handle_initialize_config(
+            context,
+            default_fee_bps,
+            fee_recipient,
+        )
     }
 
     // Admin opens a new market and creates its pool vault.
