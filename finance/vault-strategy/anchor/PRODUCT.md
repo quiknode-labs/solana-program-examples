@@ -41,7 +41,7 @@ Program instructions the frontend can surface:
 Rules the UI must respect and reflect:
 
 - Deposits are accepted only when target weights sum to **exactly 10,000 bps**; a strategy is either still being configured or fully allocated and live (`StrategyNotFullyAllocated` otherwise).
-- Shares: first deposit is 1:1 with USDC minor units; later deposits mint `deposit_usdc × total_shares / NAV`. Share mint is a PDA owned by the strategy PDA.
+- Shares: every deposit, the first included, mints `deposit_usdc × (total_shares + 1,000 virtual shares) / (NAV + 1 virtual minor unit)`, floored. The share mint has 9 decimals (`SHARE_DECIMALS`: USDC's 6 plus a 3-decimal offset), so one whole share tracks one USDC at launch and a 900 USDC first deposit shows as 900 shares. The virtual offset is the first-depositor inflation defense; withdrawals divide by `total_shares` + 1,000 so the virtual shares' slice of each vault stays behind. Share mint is a PDA owned by the strategy PDA.
 - Management fee is charged by minting new shares to the manager (dilution), fixed at creation, capped at `MAX_FEE_BPS` = 1,000 bps (10%), no setter to raise it. `collect_fees` is permissionless.
 - Slippage floors are computed on-chain from the Pyth price and `max_slippage_bps` (capped at 1,000 bps); a manager-supplied minimum is not trusted.
 - `MAX_ASSETS` = 16. `deposit` re-derives the full `0..asset_count` PDA range and refuses to run if any asset account is missing (`IncompleteAssetAccounts`), so NAV can't be understated.

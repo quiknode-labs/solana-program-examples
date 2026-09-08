@@ -39,15 +39,25 @@ themselves or pair a real mint with a feed they control.
 - `deposit` prices the incoming USDC against the vault's net asset value (the
   USDC vault plus every asset vault valued at its oracle price), mints shares for
   that fraction of the vault, and deploys the deposit across the basket by
-  swapping a weight-sized slice into each asset through the router. The first
-  deposit into an empty vault mints shares one-to-one.
+  swapping a weight-sized slice into each asset through the router. Every
+  share-price division adds 1,000 virtual shares (`VIRTUAL_SHARES`) to the
+  supply and one virtual USDC minor unit (`VIRTUAL_ASSETS`) to the net asset
+  value, the defense against the first-depositor inflation attack: an empty
+  vault already has a share price, so a first deposit of 900 USDC mints 900
+  whole shares (the share mint has `SHARE_DECIMALS` = 9 decimals, USDC's six
+  plus the offset of three) and a donation straight into a vault is shared with
+  shares nobody holds. A deposit floors to zero only when the vault already
+  holds a thousand times it, and whoever inflated it that far loses about a
+  thousand times what the depositor loses.
 - `withdraw` burns shares and pays out a proportional slice of the USDC vault and
-  every asset vault, in kind.
+  every asset vault, in kind, dividing by the real supply plus the virtual
+  shares so the virtual shares' slice of each vault stays behind.
 - `rebalance` lets the manager sell one asset for USDC and buy another with it,
   keeping holdings near their targets as prices drift. Both legs are floored to
   the oracle price so a bad swap route reverts.
 - `collect_fees` accrues the time-based management fee by minting fresh shares to
-  the manager, diluting holders at the configured annual rate.
+  the manager, diluting holders at the configured annual rate. It dilutes the
+  real supply only; the virtual shares earn the manager nothing.
 
 Every swap and rebalance leg is bounded by the registered price feed: the
 program computes the oracle-implied output and rejects any swap that falls short
@@ -117,6 +127,13 @@ cargo install --git https://github.com/blueshift-gg/quasar quasar-cli --locked
 (cd mock-swap-router && cargo test)
 (cd vault-strategy && cargo test)
 ```
+
+The vault's tests cover the manager-side setup, a first deposit priced by the
+virtual offset and deployed through the router, and
+`donation_does_not_inflate_share_price`: a one-minor-unit deposit, a 1,000 USDC
+transfer straight into the USDC vault, then a 1,000 USDC deposit with no
+`minimum_shares` floor, whose shares are nonzero and redeem for all but a
+fraction of a dollar while the attacker loses about a thousand times as much.
 
 The router suite (`mock-swap-router/src/tests.rs`) exercises initialize, set-rate,
 and a USDC-for-asset swap. The vault suite (`vault-strategy/src/tests.rs`) drives

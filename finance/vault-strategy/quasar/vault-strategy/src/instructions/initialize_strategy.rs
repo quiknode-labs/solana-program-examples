@@ -3,7 +3,7 @@ use quasar_lang::sysvars::Sysvar as _;
 use quasar_spl::prelude::*;
 
 use crate::errors::VaultError;
-use crate::state::{Registry, ShareMintPda, Strategy, StrategyInner, UsdcVaultPda};
+use crate::state::{Registry, ShareMintPda, Strategy, StrategyInner, UsdcVaultPda, SHARE_DECIMALS};
 
 /// Highest annual management fee a manager may set (10%). `collect_fees` mints
 /// shares to the manager and dilutes every depositor, so an uncapped fee would
@@ -30,7 +30,7 @@ pub struct InitializeStrategyAccountConstraints {
     #[account(
         init,
         payer = manager,
-        mint(decimals = 6, authority = strategy, freeze_authority = None, token_program = token_program),
+        mint(decimals = SHARE_DECIMALS, authority = strategy, freeze_authority = None, token_program = token_program),
         address = ShareMintPda::seeds(strategy.address()),
     )]
     pub share_mint: Account<Mint>,

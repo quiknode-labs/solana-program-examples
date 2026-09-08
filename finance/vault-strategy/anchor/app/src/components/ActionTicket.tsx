@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { applyToleranceFloor, estimateRedeem, estimateSharesOut, parseAmount } from "../lib/amounts";
 import { describeError } from "../lib/tx";
+import { SHARE_DECIMALS } from "../solana/config";
 import { formatShares, formatUnits, formatUsdc, shortAddress } from "../solana/format";
 import type { Position, StrategyView } from "../solana/strategy";
 import { Button, Segmented, StatusLine, TextField, type TxStatus } from "./atoms";
@@ -61,7 +62,7 @@ export function ActionTicket({ view, connected, walletUsdc, position, onDeposit,
     (walletUsdc === null || usdcMinor <= walletUsdc);
 
   // redeem derivations
-  const sharesMinor = parseAmount(redeemInput, 6);
+  const sharesMinor = parseAmount(redeemInput, SHARE_DECIMALS);
   const redeemInvalid = redeemInput.trim() !== "" && sharesMinor === null;
   const redeemEst = sharesMinor !== null && sharesMinor > 0n ? estimateRedeem(sharesMinor, view) : null;
 
@@ -167,7 +168,7 @@ export function ActionTicket({ view, connected, walletUsdc, position, onDeposit,
               right={
                 <button
                   type="button"
-                  onClick={() => setRedeemInput(rawAmount(shares))}
+                  onClick={() => setRedeemInput(rawAmount(shares, SHARE_DECIMALS))}
                   className="tabular-nums transition-colors hover:text-accent"
                 >
                   Balance {formatShares(shares)} · Max

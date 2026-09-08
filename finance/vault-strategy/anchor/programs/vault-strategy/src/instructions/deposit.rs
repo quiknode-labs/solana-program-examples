@@ -9,7 +9,7 @@ use mock_swap_router::cpi::accounts::SwapUsdcForAssetAccountConstraints as Route
 
 use crate::error::VaultError;
 use crate::oracle::{asset_value_in_usdc, load_price, read_token_amount, PYTH_PRICE_PRECISION};
-use crate::state::{AssetConfig, Strategy};
+use crate::state::{AssetConfig, Strategy, VIRTUAL_ASSETS, VIRTUAL_SHARES};
 
 #[derive(Accounts)]
 pub struct DepositAccountConstraints {
@@ -152,16 +152,30 @@ pub fn handle_deposit(
             .ok_or(VaultError::MathOverflow)?;
     }
 
-    // shares = usdc_amount * total_shares / nav (floor); first deposit is 1:1.
-    let shares_to_mint: u64 = if total_shares == 0 {
-        usdc_amount
-    } else {
-        (usdc_amount as u128)
-            .checked_mul(total_shares as u128)
-            .ok_or(VaultError::MathOverflow)?
-            .checked_div(nav)
-            .ok_or(VaultError::MathOverflow)? as u64
-    };
+    // shares = usdc_amount * (total_shares + VIRTUAL_SHARES) / (nav + VIRTUAL_ASSETS),
+    // floored in the fund's favour.
+    //
+    // The virtual offset is the defense against the first-depositor inflation
+    // attack. Tokens sent straight to a vault count as fund value the moment they
+    // arrive, so without it a dust-sized first deposit followed by a donation
+    // could price one share at more than the next deposit, which then floors to
+    // zero shares. With `VIRTUAL_SHARES` (10^3) standing behind one virtual minor
+    // unit, an empty fund already has a share price: the first deposit mints a
+    // thousand share minor units per USDC minor unit, which at nine share
+    // decimals is one whole share per USDC, and a donation is split between the
+    // real shares and the virtual ones. A deposit floors to zero only when the
+    // fund already holds more than a thousand times it, and whoever inflated the
+    // fund that far loses about a thousand times what the depositor loses.
+    let shares_to_mint: u64 = (usdc_amount as u128)
+        .checked_mul(total_shares as u128 + VIRTUAL_SHARES as u128)
+        .ok_or(VaultError::MathOverflow)?
+        .checked_div(
+            nav.checked_add(VIRTUAL_ASSETS as u128)
+                .ok_or(VaultError::MathOverflow)?,
+        )
+        .ok_or(VaultError::MathOverflow)?
+        .try_into()
+        .map_err(|_| VaultError::MathOverflow)?;
 
     require!(
         shares_to_mint >= minimum_shares,

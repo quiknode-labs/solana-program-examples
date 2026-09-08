@@ -13,6 +13,7 @@ use {
         get_token_account_balance, mint_tokens_to_token_account,
         send_transaction_from_instructions,
     },
+    vault_strategy::state::{SHARE_DECIMALS, VIRTUAL_SHARES},
 };
 
 fn token_program_id() -> Address {
@@ -85,6 +86,11 @@ const TSLA_PRICE: i64 = 25_000_000_000; // $250
 const NVDA_PRICE: i64 = 18_000_000_000; // $180
 const TSLA_RATE: u64 = 250; // router usdc per token
 const NVDA_RATE: u64 = 180;
+
+/// One whole share in share-mint minor units. The share mint has USDC's six
+/// decimals plus the program's three-decimal virtual-share offset, so a 900
+/// USDC first deposit mints 900 whole shares, or 900 * SHARE_UNIT minor units.
+const SHARE_UNIT: u64 = 10u64.pow(SHARE_DECIMALS as u32);
 
 const FEE_BPS: u16 = 100; // 1%
 const SLIPPAGE_BPS: u16 = 100; // 1%
@@ -734,6 +740,15 @@ fn test_initialize_and_add_assets() {
     assert_eq!(strategy.max_slippage_bps, SLIPPAGE_BPS);
     assert_eq!(strategy.registry, ctx.registry_pda);
 
+    // The share mint carries USDC's six decimals plus the virtual-share offset.
+    // Token mint layout: supply is the u64 at bytes 36..44, decimals the byte at 44.
+    let share_mint = ctx.svm.get_account(&ctx.share_mint_pda).unwrap().data;
+    assert_eq!(
+        u64::from_le_bytes(share_mint[36..44].try_into().unwrap()),
+        0
+    );
+    assert_eq!(share_mint[44], SHARE_DECIMALS);
+
     let cfg0 = ctx.svm.get_account(&ctx.asset_config(0)).unwrap();
     let asset0 = vault_strategy::state::AssetConfig::try_deserialize(&mut &cfg0.data[..]).unwrap();
     assert_eq!(asset0.mint, ctx.tsla_mint);
@@ -908,13 +923,19 @@ fn test_deposit_first() {
 
     let amount = 1_000_000u64; // 1 USDC
     let user = fund_user(&mut ctx, amount);
-    let user_share = do_deposit(&mut ctx, &user, amount, amount);
+    let user_share = do_deposit(&mut ctx, &user, amount, SHARE_UNIT);
 
-    // First deposit is 1:1, then deployed at 40/60: 0.4 USDC -> TSLAx, 0.6 -> NVDAx,
-    // leaving no idle USDC.
+    // The first deposit is priced by the virtual offset: 1 USDC minor unit buys
+    // VIRTUAL_SHARES share minor units, so 1 USDC mints exactly one whole share.
+    // It is then deployed at 40/60: 0.4 USDC -> TSLAx, 0.6 -> NVDAx, leaving no
+    // idle USDC.
     assert_eq!(
         get_token_account_balance(&ctx.svm, &user_share).unwrap(),
-        amount
+        amount * VIRTUAL_SHARES
+    );
+    assert_eq!(
+        get_token_account_balance(&ctx.svm, &user_share).unwrap(),
+        SHARE_UNIT
     );
     assert_eq!(
         get_token_account_balance(&ctx.svm, &ctx.vault_usdc).unwrap(),
@@ -1006,34 +1027,37 @@ fn test_deposit_fair_pricing() {
     let mut ctx = setup_full();
     standard_strategy(&mut ctx);
 
-    // Alice deposits 900 USDC (first deposit 1:1 -> 900,000,000 shares), auto-deployed
-    // 40/60: 1.44 TSLAx + 3.0 NVDAx. NAV = 900 USDC.
+    // Alice deposits 900 USDC into the empty fund: 900,000,000 minor units times
+    // (0 + 1000 virtual shares) over (0 + 1 virtual minor unit) = 900 whole shares.
+    // Auto-deployed 40/60: 1.44 TSLAx + 3.0 NVDAx. NAV = 900 USDC.
     let alice = fund_user(&mut ctx, 900_000_000);
     let alice_share = do_deposit(&mut ctx, &alice, 900_000_000, 1);
     assert_eq!(
         get_token_account_balance(&ctx.svm, &alice_share).unwrap(),
-        900_000_000
+        900 * SHARE_UNIT
     );
 
     // NVDAx rises 180 -> 200. NAV rises to 0 + 1.44*250 + 3.0*200 = 960 USDC.
     set_nvda_price(&mut ctx, 20_000_000_000, 200);
 
-    // Bob deposits 480 USDC at the higher NAV: shares = 480 * 900 / 960 = 450,000,000.
-    // He pays today's price, so he does not dilute Alice's gain.
+    // Bob deposits 480 USDC at the higher NAV: shares = 480 * 900 / 960 = 450 whole
+    // shares. He pays today's price, so he does not dilute Alice's gain. The
+    // virtual offset shows up 10 digits down: 480,000,000 * (900 * SHARE_UNIT +
+    // 1000) / (960,000,000 + 1) floors to 450,000,000,031 minor units.
     let bob = fund_user(&mut ctx, 480_000_000);
     let bob_share = do_deposit(&mut ctx, &bob, 480_000_000, 1);
-    assert_eq!(
-        get_token_account_balance(&ctx.svm, &bob_share).unwrap(),
-        450_000_000
-    );
+    let bob_shares = get_token_account_balance(&ctx.svm, &bob_share).unwrap();
+    assert_eq!(bob_shares / SHARE_UNIT, 450);
+    assert_eq!(bob_shares, 450_000_000_031);
 
     // Alice's shares are untouched; supply is the two deposits combined.
     assert_eq!(
         get_token_account_balance(&ctx.svm, &alice_share).unwrap(),
-        900_000_000
+        900 * SHARE_UNIT
     );
     let strategy = read_strategy(&ctx);
-    assert_eq!(strategy.total_shares, 1_350_000_000);
+    assert_eq!(strategy.total_shares, 900 * SHARE_UNIT + bob_shares);
+    assert_eq!(strategy.total_shares / SHARE_UNIT, 1_350);
 }
 
 #[test]
@@ -1078,10 +1102,11 @@ fn test_collect_fees() {
     advance_one_year(&mut ctx);
     let manager_share = do_collect_fees(&mut ctx);
 
-    // 1% of 1,000,000,000 = 10,000,000 fee shares.
+    // 1% of the 1,000 whole shares the deposit minted = 10 whole shares. The fee
+    // dilutes the real supply only; the virtual shares earn the manager nothing.
     assert_eq!(
         get_token_account_balance(&ctx.svm, &manager_share).unwrap(),
-        10_000_000
+        10 * SHARE_UNIT
     );
 }
 
@@ -1141,16 +1166,27 @@ fn test_withdraw() {
     );
     send_transaction_from_instructions(&mut ctx.svm, vec![ix], &[&user], &user.pubkey()).unwrap();
 
-    // Sole holder withdraws everything in kind: all 16000 TSLAx + 33333 NVDAx, no USDC.
+    // The sole holder withdraws everything in kind. Each leg pays balance * shares
+    // / (shares + 1000 virtual shares), so the virtual shares' slice of each vault
+    // stays behind: one minor unit of TSLAx and one of NVDAx, and no USDC.
     assert_eq!(get_token_account_balance(&ctx.svm, &user_usdc).unwrap(), 0);
     assert_eq!(
         get_token_account_balance(&ctx.svm, &derive_ata(&user.pubkey(), &ctx.tsla_mint)).unwrap(),
-        16_000
+        15_999
     );
     assert_eq!(
         get_token_account_balance(&ctx.svm, &derive_ata(&user.pubkey(), &ctx.nvda_mint)).unwrap(),
-        33_333
+        33_332
     );
+    assert_eq!(
+        get_token_account_balance(&ctx.svm, &ctx.vault_tsla).unwrap(),
+        1
+    );
+    assert_eq!(
+        get_token_account_balance(&ctx.svm, &ctx.vault_nvda).unwrap(),
+        1
+    );
+    assert_eq!(read_strategy(&ctx).total_shares, 0);
 }
 
 #[test]
@@ -1331,12 +1367,12 @@ fn test_full_lifecycle() {
     let mut ctx = setup_full();
     standard_strategy(&mut ctx);
 
-    // Alice deposits 900 USDC -> 900,000,000 shares, deployed to 1.44 TSLAx + 3.0 NVDAx.
+    // Alice deposits 900 USDC -> 900 whole shares, deployed to 1.44 TSLAx + 3.0 NVDAx.
     let alice = fund_user(&mut ctx, 900_000_000);
     let alice_share = do_deposit(&mut ctx, &alice, 900_000_000, 1);
     assert_eq!(
         get_token_account_balance(&ctx.svm, &alice_share).unwrap(),
-        900_000_000
+        900 * SHARE_UNIT
     );
     assert_eq!(
         get_token_account_balance(&ctx.svm, &ctx.vault_tsla).unwrap(),
@@ -1359,13 +1395,13 @@ fn test_full_lifecycle() {
         2_880_000
     );
 
-    // Bob deposits 480 USDC at NAV 960 -> 450,000,000 shares, deployed 40/60.
+    // Bob deposits 480 USDC at NAV 960 -> 450 whole shares (450,000,000,031 minor
+    // units, the last two digits being the virtual offset's rounding), deployed 40/60.
     let bob = fund_user(&mut ctx, 480_000_000);
     let bob_share = do_deposit(&mut ctx, &bob, 480_000_000, 1);
-    assert_eq!(
-        get_token_account_balance(&ctx.svm, &bob_share).unwrap(),
-        450_000_000
-    );
+    let bob_shares = get_token_account_balance(&ctx.svm, &bob_share).unwrap();
+    assert_eq!(bob_shares / SHARE_UNIT, 450);
+    assert_eq!(bob_shares, 450_000_000_031);
     assert_eq!(
         get_token_account_balance(&ctx.svm, &ctx.vault_tsla).unwrap(),
         2_304_000
@@ -1375,17 +1411,20 @@ fn test_full_lifecycle() {
         4_320_000
     );
 
-    // A year passes; the manager collects 1% of the 1,350,000,000 supply = 13,500,000.
+    // A year passes; the manager collects 1% of the 1,350 whole-share supply = 13.5
+    // whole shares. The 31 minor units of Bob's rounding earn 0.31, which floors away.
     advance_one_year(&mut ctx);
     let manager_share = do_collect_fees(&mut ctx);
-    assert_eq!(
-        get_token_account_balance(&ctx.svm, &manager_share).unwrap(),
-        13_500_000
-    );
-    assert_eq!(read_strategy(&ctx).total_shares, 1_363_500_000);
+    let fee_shares = get_token_account_balance(&ctx.svm, &manager_share).unwrap();
+    assert_eq!(fee_shares, 13_500_000_000);
+    assert_eq!(fee_shares * 10 / SHARE_UNIT, 135);
+    let supply = 900 * SHARE_UNIT + bob_shares + fee_shares;
+    assert_eq!(read_strategy(&ctx).total_shares, supply);
+    assert_eq!(supply, 1_363_500_000_031);
 
-    // Alice withdraws all 900,000,000 shares in kind: her 900/1363.5 slice of each vault.
-    do_withdraw(&mut ctx, &alice, 900_000_000, 0);
+    // Alice withdraws all 900 whole shares in kind: her 900/1363.5 slice of each
+    // vault, the divisor being the real supply plus the 1000 virtual shares.
+    do_withdraw(&mut ctx, &alice, 900 * SHARE_UNIT, 0);
     assert_eq!(
         get_token_account_balance(&ctx.svm, &derive_ata(&alice.pubkey(), &ctx.tsla_mint)).unwrap(),
         1_520_792
@@ -1398,5 +1437,113 @@ fn test_full_lifecycle() {
         get_token_account_balance(&ctx.svm, &derive_ata(&alice.pubkey(), &ctx.usdc_mint)).unwrap(),
         0
     );
-    assert_eq!(read_strategy(&ctx).total_shares, 463_500_000);
+    assert_eq!(read_strategy(&ctx).total_shares, supply - 900 * SHARE_UNIT);
+}
+
+/// A share-price value in USDC minor units, at the test's oracle prices: USDC
+/// plus TSLAx at $250 plus NVDAx at $180.
+fn value_in_usdc(usdc: u64, tsla: u64, nvda: u64) -> u64 {
+    usdc + tsla * (TSLA_PRICE as u64 / 100_000_000) + nvda * (NVDA_PRICE as u64 / 100_000_000)
+}
+
+/// The first-depositor inflation attack: a dust deposit, then a donation straight
+/// into the strategy's USDC vault, then a 1,000 USDC deposit with no
+/// `minimum_shares` floor. The virtual offset prices the dust deposit at 1000
+/// share minor units, splits the donation between those and the 1000 virtual
+/// shares, and keeps the victim's shares nonzero: they redeem for all but a
+/// fraction of a dollar, while the attacker recovers about half of the donation
+/// and loses the rest to the virtual shares. Modeled on the lending example's
+/// `raw_token_donation_does_not_inflate_exchange_rate`.
+#[test]
+fn test_donation_does_not_inflate_share_price() {
+    let mut ctx = setup_full();
+    standard_strategy(&mut ctx);
+
+    let donation = 1_000_000_000u64; // 1,000 USDC
+    let victim_deposit = 1_000_000_000u64; // 1,000 USDC
+
+    // The attacker deposits one minor unit through the handler. Both deploy legs
+    // floor to zero, so the minor unit stays in the USDC vault, and the offset
+    // prices it at 1 * (0 + 1000) / (0 + 1) = 1000 share minor units.
+    let attacker = fund_user(&mut ctx, 1 + donation);
+    let attacker_share = do_deposit(&mut ctx, &attacker, 1, 0);
+    assert_eq!(
+        get_token_account_balance(&ctx.svm, &attacker_share).unwrap(),
+        VIRTUAL_SHARES
+    );
+
+    // The attacker sends 1,000 USDC straight to the USDC vault with an ordinary
+    // token transfer. The deposit handler never ran, so the supply is still 1000
+    // share minor units, now against a NAV of 1,000.000001 USDC.
+    let donate_ix = spl_token::instruction::transfer(
+        &spl_token::ID,
+        &derive_ata(&attacker.pubkey(), &ctx.usdc_mint),
+        &ctx.vault_usdc,
+        &attacker.pubkey(),
+        &[],
+        donation,
+    )
+    .unwrap();
+    send_transaction_from_instructions(
+        &mut ctx.svm,
+        vec![donate_ix],
+        &[&attacker],
+        &attacker.pubkey(),
+    )
+    .unwrap();
+    assert_eq!(
+        get_token_account_balance(&ctx.svm, &ctx.vault_usdc).unwrap(),
+        1 + donation
+    );
+
+    // The victim deposits 1,000 USDC with no minimum_shares floor. Without the
+    // offset this would be 1,000,000,000 * 1 / 1,000,000,001 = 0 shares. With it:
+    // 1,000,000,000 * (1000 + 1000) / (1,000,000,001 + 1) = 1999 share minor units.
+    let victim = fund_user(&mut ctx, victim_deposit);
+    let victim_share = do_deposit(&mut ctx, &victim, victim_deposit, 0);
+    let victim_shares = get_token_account_balance(&ctx.svm, &victim_share).unwrap();
+    assert!(victim_shares > 0, "the donation must not zero the deposit");
+    assert_eq!(victim_shares, 1_999);
+
+    // The victim redeems everything in kind: 1999 of the 3999 effective shares
+    // (1000 attacker + 1999 victim + 1000 virtual) of each vault, worth all but
+    // about a quarter of a dollar of the 1,000 USDC they put in.
+    do_withdraw(&mut ctx, &victim, victim_shares, 0);
+    let victim_value = value_in_usdc(
+        get_token_account_balance(&ctx.svm, &derive_ata(&victim.pubkey(), &ctx.usdc_mint)).unwrap(),
+        get_token_account_balance(&ctx.svm, &derive_ata(&victim.pubkey(), &ctx.tsla_mint)).unwrap(),
+        get_token_account_balance(&ctx.svm, &derive_ata(&victim.pubkey(), &ctx.nvda_mint)).unwrap(),
+    );
+    assert!(victim_value <= victim_deposit);
+    let victim_loss = victim_deposit - victim_value;
+    assert!(
+        victim_loss < 1_000_000,
+        "victim lost {victim_loss} minor units, more than a dollar"
+    );
+
+    // The attacker redeems their 1000 share minor units: half of what is left,
+    // the other half belonging to the virtual shares, which is to say to nobody.
+    // They put in 1,000.000001 USDC through the handler and the donation together
+    // and get back about 500 USDC, losing about a thousand times the victim's loss.
+    do_withdraw(&mut ctx, &attacker, VIRTUAL_SHARES, 0);
+    let attacker_value = value_in_usdc(
+        get_token_account_balance(&ctx.svm, &derive_ata(&attacker.pubkey(), &ctx.usdc_mint))
+            .unwrap(),
+        get_token_account_balance(&ctx.svm, &derive_ata(&attacker.pubkey(), &ctx.tsla_mint))
+            .unwrap(),
+        get_token_account_balance(&ctx.svm, &derive_ata(&attacker.pubkey(), &ctx.nvda_mint))
+            .unwrap(),
+    );
+    let attacker_in = 1 + donation;
+    assert!(
+        attacker_value < attacker_in,
+        "the attack must not pay: put in {attacker_in}, got back {attacker_value}"
+    );
+    let attacker_loss = attacker_in - attacker_value;
+    assert!(
+        attacker_loss >= VIRTUAL_SHARES * victim_loss,
+        "attacker lost {attacker_loss}, victim lost {victim_loss}"
+    );
+    assert!(attacker_value <= attacker_in / 2 + 1_000_000);
+    assert_eq!(read_strategy(&ctx).total_shares, 0);
 }

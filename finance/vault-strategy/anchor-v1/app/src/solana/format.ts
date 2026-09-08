@@ -1,5 +1,5 @@
 import type { PublicKey } from "@solana/web3.js";
-import { CLUSTER, RPC_URL } from "./config";
+import { CLUSTER, RPC_URL, SHARE_DECIMALS } from "./config";
 
 function groupThousands(intDigits: string): string {
   return intDigits.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -19,9 +19,9 @@ export function formatUnits(minor: bigint, decimals: number, frac = 2): string {
 /** USDC amount (6dp minor units) → "1,363.50". */
 export const formatUsdc = (minor: bigint, frac = 2): string => formatUnits(minor, 6, frac);
 
-/** Share amount (6dp minor units) → "900.000000", trailing zeros trimmed to `minFrac`. */
+/** Share amount (SHARE_DECIMALS minor units) → "900.000000000", trailing zeros trimmed to `minFrac`. */
 export function formatShares(minor: bigint, minFrac = 2): string {
-  const full = formatUnits(minor, 6, 6);
+  const full = formatUnits(minor, SHARE_DECIMALS, SHARE_DECIMALS);
   if (!full.includes(".")) return full;
   const [w, f] = full.split(".");
   const trimmed = f.replace(/0+$/, "");

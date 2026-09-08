@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-09-08]
+
+### Changed
+
+- **Virtual shares and virtual assets.** Every share-price division adds
+  `VIRTUAL_SHARES` (1,000) to the real supply and `VIRTUAL_ASSETS` (one USDC
+  minor unit) to the net asset value, matching the Anchor build: `deposit`
+  mints `usdc × (total_shares + 1,000) / (NAV + 1)` with no first-deposit
+  special case, and `withdraw` pays `balance × shares / (total_shares + 1,000)`
+  per vault. This is the defense against the first-depositor inflation attack.
+- **Share mint decimals 6 → 9** (`SHARE_DECIMALS`), so a 900 USDC first deposit
+  still reads as 900 shares.
+
+### Added
+
+- `donation_does_not_inflate_share_price`: the attack run against the program,
+  with the victim's shares nonzero and redeeming for about 999.75 USDC and the
+  attacker losing about half of the donation to the virtual shares.
+
 ## [2026-07-22]
 
 ### Changed

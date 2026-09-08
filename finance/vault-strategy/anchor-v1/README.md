@@ -37,8 +37,10 @@ Prices come from [Pyth Network](https://pyth.network/) `PriceUpdateV2` accounts.
 
 A [share](https://www.investopedia.com/terms/s/shares.asp) represents a fraction of the whole strategy. Hold 1% of shares and you own 1% of every vault.
 
-- **First deposit**: shares are issued 1:1 with USDC minor units (initial price of 1 USDC per share).
-- **Later deposits**: `shares_to_mint = deposit_usdc × total_shares / NAV`.
+- **Every deposit**, the first included: `shares_to_mint = deposit_usdc × (total_shares + VIRTUAL_SHARES) / (NAV + VIRTUAL_ASSETS)`, floored.
+- **The virtual offset** is the defense against the first-depositor inflation attack. `VIRTUAL_SHARES` is 1,000 (`10^SHARE_DECIMALS_OFFSET`) and `VIRTUAL_ASSETS` is one USDC minor unit, so an empty strategy already has a share price and there is no special case for the first deposit. The share mint has `SHARE_DECIMALS` = 9 decimals, USDC's six plus the offset of three, so one whole share still tracks one USDC at launch: a 900 USDC first deposit mints 900,000,000,000 share minor units, which reads as 900 shares.
+- **Why it is safe**: tokens sent straight to a vault count as fund value the moment they arrive, so without the offset a dust first deposit followed by a donation could price one share above the next deposit, which would floor to zero shares. With it, a deposit floors to zero only when the strategy already holds more than a thousand times it, and a donation is split between the real shares and the virtual ones, so an attacker loses about a thousand times what the next depositor loses. Deposit one minor unit, donate 1,000 USDC, and a following 1,000 USDC deposit still mints 1,999 share minor units that redeem for about 999.75 USDC; the attacker's 1,000 share minor units redeem for about 500 USDC. Pinned by `test_donation_does_not_inflate_share_price`.
+- **Withdrawals** pay `vault_balance × shares / (total_shares + VIRTUAL_SHARES)` per vault, floored, so the virtual shares' slice of every vault (at most 1,000 parts in `total_shares` + 1,000) is never paid out.
 - Shares are [SPL tokens](https://solana.com/docs/terminology#token); the share mint's address is a [PDA](https://solana.com/docs/terminology#program-derived-address-pda), so it is deterministic and the strategy PDA is its mint authority.
 
 ### Management Fee
@@ -49,7 +51,7 @@ A [management fee](https://www.investopedia.com/terms/m/managementfee.asp), in [
 fee_shares = total_shares × fee_bps × elapsed_seconds / (10_000 × 31_536_000)
 ```
 
-`collect_fees` is permissionless. The fee is fixed at creation and capped at `MAX_FEE_BPS` (1,000 bps = 10%); there is no setter to raise it later.
+The fee dilutes the real supply only: the virtual shares hold nothing of anyone's and earn the manager nothing. `collect_fees` is permissionless. The fee is fixed at creation and capped at `MAX_FEE_BPS` (1,000 bps = 10%); there is no setter to raise it later.
 
 ### Weights and Rebalancing
 
@@ -92,7 +94,7 @@ An [in-kind distribution](https://www.investopedia.com/terms/i/in-kind.asp) retu
 
 ### Alice deposits, and her money is deployed at once
 
-`deposit(usdc_amount, minimum_shares)`, with each asset's `[asset_config, vault, mint, rate, price_feed]` passed as remaining accounts, plus the router accounts. The handler requires the strategy to be fully allocated, values every asset for NAV (first deposit is 1:1), mints shares to Alice, then deploys her USDC across the basket at its target weights through the router, each leg under an oracle slippage floor. With the weights at 40/60, a 900 USDC deposit lands as 1.44 TSLAx and 3.0 NVDAx with no idle USDC.
+`deposit(usdc_amount, minimum_shares)`, with each asset's `[asset_config, vault, mint, rate, price_feed]` passed as remaining accounts, plus the router accounts. The handler requires the strategy to be fully allocated, values every asset for NAV, prices her shares with the virtual offset (900 USDC into the empty strategy mints 900 whole shares), mints them to Alice, then deploys her USDC across the basket at its target weights through the router, each leg under an oracle slippage floor. With the weights at 40/60, a 900 USDC deposit lands as 1.44 TSLAx and 3.0 NVDAx with no idle USDC.
 
 ### Bob deposits at the current share price
 
@@ -157,7 +159,7 @@ cargo build-sbf --manifest-path programs/vault-strategy/Cargo.toml
 cargo test --manifest-path programs/vault-strategy/Cargo.toml
 ```
 
-Tests live in `programs/vault-strategy/tests/vault_strategy.rs` and use [LiteSVM](https://github.com/LiteSVM/litesvm). Both `.so` files are loaded from `target/deploy/`, so build before testing. The suite covers the full lifecycle end to end (deposit with auto-deployment, a price move, rebalance back to target, a second depositor priced at the new NAV, a year's fee, in-kind withdrawal), retiring an asset with `set_weight` and reallocating to reopen deposits, and the rejection paths: unapproved asset, weight overflow, over-cap fee and slippage, oracle-bounded deposit slippage, an under-allocated strategy, non-manager `set_weight`, unregistered router, and incomplete asset accounts on deposit.
+Tests live in `programs/vault-strategy/tests/vault_strategy.rs` and use [LiteSVM](https://github.com/LiteSVM/litesvm). Both `.so` files are loaded from `target/deploy/`, so build before testing. The suite covers the full lifecycle end to end (deposit with auto-deployment, a price move, rebalance back to target, a second depositor priced at the new NAV, a year's fee, in-kind withdrawal), retiring an asset with `set_weight` and reallocating to reopen deposits, and the rejection paths: unapproved asset, weight overflow, over-cap fee and slippage, oracle-bounded deposit slippage, an under-allocated strategy, non-manager `set_weight`, unregistered router, and incomplete asset accounts on deposit. `test_donation_does_not_inflate_share_price` runs the first-depositor inflation attack (a one-minor-unit deposit, a 1,000 USDC donation straight into the USDC vault, then a 1,000 USDC deposit with no `minimum_shares` floor) and checks that the victim's shares are nonzero and redeem for all but a fraction of a dollar while the attacker loses about a thousand times as much.
 
 ## FAQ
 
@@ -167,7 +169,7 @@ A manager creates a strategy with `initialize_strategy`, registers curator-appro
 
 ### How are share prices calculated?
 
-Shares are priced at the strategy's net asset value: the total value of the vault balances at current prices divided by shares outstanding. A later depositor pays the current share price rather than diluting earlier ones.
+Shares are priced at the strategy's net asset value: the total value of the vault balances at current prices, plus one virtual minor unit, divided by shares outstanding plus 1,000 virtual shares. A later depositor pays the current share price rather than diluting earlier ones, and the virtual offset keeps the price defined and the first depositor honest when the strategy is empty.
 
 ### How does the manager operate the fund?
 

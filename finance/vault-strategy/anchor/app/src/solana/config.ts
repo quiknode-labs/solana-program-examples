@@ -34,4 +34,13 @@ export const MAX_SLIPPAGE_BPS = 1_000; // 10%
 export const BPS_DENOMINATOR = 10_000;
 export const PYTH_PRICE_PRECISION = 100_000_000n; // 10^8, Pyth exponent -8
 export const MAX_PRICE_AGE_SECONDS = 60;
-export const SHARE_DECIMALS = 6; // share_mint is created with mint::decimals = 6
+// The share mint has USDC's 6 decimals plus SHARE_DECIMALS_OFFSET, so one whole
+// share tracks one USDC at launch (state/strategy.rs: SHARE_DECIMALS).
+export const SHARE_DECIMALS_OFFSET = 3;
+export const SHARE_DECIMALS = 6 + SHARE_DECIMALS_OFFSET;
+/** One whole share in share-mint minor units. */
+export const SHARE_UNIT = 10n ** BigInt(SHARE_DECIMALS);
+// The virtual offset every share-price division carries (state/strategy.rs):
+// 10^SHARE_DECIMALS_OFFSET virtual shares behind one virtual USDC minor unit.
+export const VIRTUAL_SHARES = 10n ** BigInt(SHARE_DECIMALS_OFFSET);
+export const VIRTUAL_ASSETS = 1n;
