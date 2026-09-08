@@ -1,7 +1,14 @@
 import type { BN } from "@coral-xyz/anchor";
 import type { Connection, PublicKey } from "@solana/web3.js";
 import type { AssetConfigAccount, StrategyAccount } from "../idl/vaultStrategy";
-import { MAX_PRICE_AGE_SECONDS, PYTH_PRICE_PRECISION, STRATEGY_INDEX } from "./config";
+import {
+  MAX_PRICE_AGE_SECONDS,
+  PYTH_PRICE_PRECISION,
+  SHARE_UNIT,
+  STRATEGY_INDEX,
+  VIRTUAL_ASSETS,
+  VIRTUAL_SHARES,
+} from "./config";
 import { assetConfigPda, shareMintPda, strategyPda, userAta, vaultAta } from "./pdas";
 import type { VaultProgram } from "./program";
 import { parsePriceUpdateV2, readTokenAmount } from "./pyth";
@@ -176,7 +183,9 @@ export async function loadStrategyView(
   }
 
   const totalShares = toBig(account.totalShares);
-  const navPerShareMinor = totalShares > 0n ? (navMinor * 1_000_000n) / totalShares : 1_000_000n;
+  // USDC minor units per whole share, priced the way the program prices a deposit:
+  // (nav + VIRTUAL_ASSETS) / (shares + VIRTUAL_SHARES), scaled to one whole share.
+  const navPerShareMinor = ((navMinor + VIRTUAL_ASSETS) * SHARE_UNIT) / (totalShares + VIRTUAL_SHARES);
 
   return {
     exists: true,

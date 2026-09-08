@@ -121,14 +121,14 @@ NARRATION:
 
 Alice wants exposure to both stocks without buying and rebalancing them herself, so she calls `deposit` with 900 USDC. `deposit` is permissionless: any user can call it. This is buying into the strategy.
 
-The handler prices her shares against net asset value. It walks the complete asset set, index zero then index one, reading each vault's balance and each Pyth price, and it will not proceed unless every asset's accounts are present, so nothing can be hidden from the valuation. The strategy is empty, so net asset value is zero, and the first deposit is defined as one to one. Alice gets 900 shares. Shares carry six decimals, so under the hood that is 900 million minor units, but think of it as 900 shares worth a dollar each.
+The handler prices her shares against net asset value. It walks the complete asset set, index zero then index one, reading each vault's balance and each Pyth price, and it will not proceed unless every asset's accounts are present, so nothing can be hidden from the valuation. The strategy is empty, so net asset value is zero, and the share price comes from the program's virtual offset: a thousand virtual shares standing behind one virtual minor unit of USDC, added to every share-price division so that an empty strategy already has a price and a donation into a vault cannot be used to inflate it. Alice gets 900 shares. Shares carry nine decimals, USDC's six plus the offset's three, so under the hood that is 900 billion minor units, but think of it as 900 shares worth a dollar each.
 
 Checks, effects, interactions: the handler raises `total_shares` first, then pulls her USDC into the USDC vault, then mints her the shares with the strategy PDA signing.
 
 ON SCREEN:
 
 ```
-UPDATED - Strategy        total_shares: 0 -> 900,000,000
+UPDATED - Strategy        total_shares: 0 -> 900,000,000,000
 UPDATED - vault_usdc      0 -> 900 USDC
 UPDATED - Alice share ATA 0 -> 900 shares
 
@@ -179,13 +179,13 @@ ON SCREEN:
 ```
 Net asset value before Bob: 0 + 1.44 x 250 + 3.0 x 200 = 360 + 600 = 960 USDC
 
-UPDATED - Strategy        total_shares: 900,000,000 -> 1,350,000,000
+UPDATED - Strategy        total_shares: 900,000,000,000 -> 1,350,000,000,031
 UPDATED - vault_usdc      0 -> 480 USDC
 UPDATED - Bob share ATA   0 -> 450 shares
 
 TOKEN MOVEMENT:
     Bob USDC ATA -> vault_usdc        480 USDC
-    share_mint   -> Bob share ATA     450 shares   (480 x 900 / 960 = 450)
+    share_mint   -> Bob share ATA     450 shares   (480 x (900 + 1,000 virtual minor units) / (960 + 1 virtual minor unit) = 450.000000031)
 
 Fee generated: none
 ```
@@ -227,9 +227,9 @@ ON SCREEN:
 ```
 elapsed: 1 year (illustrative)
 fee_shares = total_shares x fee_bps x elapsed / (10,000 x seconds_per_year)
-           = 1,350,000,000 x 100 x 1yr / (10,000 x 1yr) = 13,500,000  (13.5 shares)
+           = 1,350,000,000,031 x 100 x 1yr / (10,000 x 1yr) = 13,500,000,000  (13.5 shares; the virtual shares earn nothing)
 
-UPDATED - Strategy        total_shares: 1,350,000,000 -> 1,363,500,000
+UPDATED - Strategy        total_shares: 1,350,000,000,031 -> 1,363,500,000,031
                           last_fee_accrual_timestamp: updated
 UPDATED - Maria share ATA 0 -> 13.5 shares
 
@@ -244,18 +244,18 @@ NARRATION:
 
 Alice calls `withdraw` and burns all 900 of her shares. Here is the part people miss: withdrawal is in kind and proportional. She does not get cash. She gets her exact fraction of every balance the strategy holds, across the USDC vault and both asset vaults. It is the same move an ETF makes when it redeems in kind, handing back the underlying holdings instead of cash. Just like deposit, the handler insists on seeing every asset, so her slice is computed against the whole strategy.
 
-Her fraction is 900 shares out of the 1,363.5 that now exist. The handler floors each amount in the protocol's favor, so any rounding dust stays with the remaining holders.
+Her fraction is 900 shares out of the 1,363.5 that now exist, plus the thousand virtual minor units that never leave, which is where the dust of the first-depositor defense goes. The handler floors each amount in the protocol's favor, so any rounding dust stays with the remaining holders.
 
 ON SCREEN:
 
 ```
-Alice fraction = 900,000,000 / 1,363,500,000
+Alice fraction = 900,000,000,000 / (1,363,500,000,031 + 1,000 virtual)
 
-amount_usdc = 480,000,000 x 900,000,000 / 1,363,500,000 = 316,831,683  (316.83 USDC, floor)
-amount_tsla =   1,080,000 x 900,000,000 / 1,363,500,000 =     712,871  (0.712871 TSLAx, floor)
-amount_nvda =   3,500,000 x 900,000,000 / 1,363,500,000 =   2,310,231  (2.310231 NVDAx, floor)
+amount_usdc = 480,000,000 x 900,000,000,000 / 1,363,500,001,031 = 316,831,682  (316.83 USDC, floor)
+amount_tsla =   1,080,000 x 900,000,000,000 / 1,363,500,001,031 =     712,871  (0.712871 TSLAx, floor)
+amount_nvda =   3,500,000 x 900,000,000,000 / 1,363,500,001,031 =   2,310,231  (2.310231 NVDAx, floor)
 
-UPDATED - Strategy        total_shares: 1,363,500,000 -> 463,500,000
+UPDATED - Strategy        total_shares: 1,363,500,000,031 -> 463,500,000,031
 UPDATED - Alice share ATA 900 shares -> 0   (burned)
 
 TOKEN MOVEMENT:

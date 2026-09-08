@@ -1,3 +1,4 @@
+import { VIRTUAL_ASSETS, VIRTUAL_SHARES } from "../solana/config";
 import type { StrategyView } from "../solana/strategy";
 
 /** Parse a decimal string into minor units. Returns null if malformed or over-precise. */
@@ -12,17 +13,19 @@ export function parseAmount(input: string, decimals: number): bigint | null {
   return w * 10n ** BigInt(decimals) + f;
 }
 
-/** Shares a deposit would mint, matching the program: first deposit 1:1, else usdc*shares/nav. */
+/**
+ * Shares a deposit would mint, matching the program:
+ * usdc * (shares + VIRTUAL_SHARES) / (nav + VIRTUAL_ASSETS), floored. The virtual
+ * offset prices the empty strategy too, so there is no first-deposit special case.
+ */
 export function estimateSharesOut(usdcMinor: bigint, navMinor: bigint, totalShares: bigint): bigint {
-  if (totalShares === 0n) return usdcMinor;
-  if (navMinor === 0n) return 0n;
-  return (usdcMinor * totalShares) / navMinor;
+  return (usdcMinor * (totalShares + VIRTUAL_SHARES)) / (navMinor + VIRTUAL_ASSETS);
 }
 
 export interface RedeemLeg {
   index: number;
   mint: string;
-  amountMinor: bigint; // 6dp
+  amountMinor: bigint; // the asset's own minor units (6dp for the example assets)
 }
 
 export interface RedeemEstimate {
@@ -30,7 +33,11 @@ export interface RedeemEstimate {
   legs: RedeemLeg[];
 }
 
-/** The in-kind slice a redemption pays out, matching withdraw's proportional math. */
+/**
+ * The in-kind slice a redemption pays out, matching withdraw's proportional math:
+ * balance * shares / (totalShares + VIRTUAL_SHARES) per vault, so the virtual
+ * shares' slice of every vault stays behind.
+ */
 export function estimateRedeem(sharesMinor: bigint, view: StrategyView): RedeemEstimate {
   if (view.totalShares === 0n || sharesMinor <= 0n) {
     return {
@@ -38,11 +45,12 @@ export function estimateRedeem(sharesMinor: bigint, view: StrategyView): RedeemE
       legs: view.assets.map((a) => ({ index: a.index, mint: a.mint.toBase58(), amountMinor: 0n })),
     };
   }
-  const usdcMinor = (view.usdcAmount * sharesMinor) / view.totalShares;
+  const divisor = view.totalShares + VIRTUAL_SHARES;
+  const usdcMinor = (view.usdcAmount * sharesMinor) / divisor;
   const legs = view.assets.map((a) => ({
     index: a.index,
     mint: a.mint.toBase58(),
-    amountMinor: (a.vaultAmount * sharesMinor) / view.totalShares,
+    amountMinor: (a.vaultAmount * sharesMinor) / divisor,
   }));
   return { usdcMinor, legs };
 }

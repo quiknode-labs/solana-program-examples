@@ -51,6 +51,10 @@ pub fn handle_collect_fees(
     let strategy_bump = accounts.strategy.bump;
 
     // fee_shares = total_shares * fee_bps * elapsed / (10_000 * SECONDS_PER_YEAR)
+    //
+    // The fee is a percentage of what depositors hold, so it dilutes against the
+    // real supply only. The virtual shares that price deposits and withdrawals
+    // hold nothing of anyone's and earn the manager nothing.
     let denominator = (10_000u128)
         .checked_mul(SECONDS_PER_YEAR as u128)
         .ok_or(VaultError::MathOverflow)?;

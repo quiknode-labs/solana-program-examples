@@ -11,7 +11,7 @@ use anchor_spl::{
 };
 
 use crate::error::VaultError;
-use crate::state::{Registry, Strategy};
+use crate::state::{Registry, Strategy, SHARE_DECIMALS};
 
 /// Highest annual management fee a manager may set, in basis points (10%).
 /// `collect_fees` mints shares to the manager and dilutes every depositor,
@@ -48,7 +48,7 @@ pub struct InitializeStrategyAccountConstraints {
     #[account(
         init,
         payer = manager,
-        mint::decimals = 6,
+        mint::decimals = SHARE_DECIMALS,
         mint::authority = strategy,
         mint::freeze_authority = strategy,
         mint::token_program = token_program,

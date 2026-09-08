@@ -8,7 +8,7 @@ use anchor_spl::{
 
 use crate::error::VaultError;
 use crate::oracle::{read_mint_decimals, read_token_amount, read_token_mint_and_owner};
-use crate::state::{AssetConfig, Strategy};
+use crate::state::{AssetConfig, Strategy, VIRTUAL_SHARES};
 
 #[derive(Accounts)]
 pub struct WithdrawAccountConstraints<'info> {
@@ -89,7 +89,11 @@ pub fn handle_withdraw<'info>(
     );
 
     let shares_u128 = shares_to_burn as u128;
-    let total_u128 = total_shares as u128;
+    // Every leg pays balance * shares / (total_shares + VIRTUAL_SHARES). The
+    // virtual shares hold their slice of every vault and are never burned, so
+    // even the last real holder leaves that slice behind: at most
+    // VIRTUAL_SHARES parts in (total_shares + VIRTUAL_SHARES) of each balance.
+    let total_u128 = total_shares as u128 + VIRTUAL_SHARES as u128;
 
     // USDC leg, floored in the protocol's favour.
     let amount_usdc: u64 = (vault_usdc_amount as u128)

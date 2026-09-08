@@ -11,6 +11,33 @@ use anchor_lang::prelude::*;
 /// currency, held separately, and does not count against this.
 pub const MAX_ASSETS: u8 = 16;
 
+/// Decimals of the share mint: USDC's six plus `SHARE_DECIMALS_OFFSET`, so one
+/// whole share still tracks one USDC at launch (a 900 USDC first deposit reads
+/// as 900 shares) while the supply carries three more digits than the USDC it
+/// prices.
+pub const SHARE_DECIMALS: u8 = 6 + SHARE_DECIMALS_OFFSET;
+
+/// How many more decimals the share mint has than USDC. This is the vault's
+/// first-depositor defense (virtual shares and virtual assets, the ERC-4626
+/// "decimals offset"): every exchange-rate division adds `VIRTUAL_SHARES` to
+/// the share supply and `VIRTUAL_ASSETS` to the net asset value, so an empty
+/// fund already has a share price (one minor unit of USDC per `10^OFFSET` share
+/// minor units), the `total_shares == 0` case needs no special branch, and a
+/// donation straight into a vault is shared with shares nobody holds. An
+/// attacker inflating the share price loses about `10^OFFSET` times whatever
+/// the next depositor loses to rounding. Three leaves `total_shares: u64` room
+/// for about eighteen billion whole shares.
+pub const SHARE_DECIMALS_OFFSET: u8 = 3;
+
+/// Virtual shares added to the real supply in every share-price division:
+/// `10^SHARE_DECIMALS_OFFSET`. They are never minted, never burned, and their
+/// slice of every vault is never paid out.
+pub const VIRTUAL_SHARES: u64 = 10u64.pow(SHARE_DECIMALS_OFFSET as u32);
+
+/// Virtual assets added to the net asset value in every share-price division:
+/// one USDC minor unit, backing the virtual shares.
+pub const VIRTUAL_ASSETS: u64 = 1;
+
 /// One strategy (basket). Its address is a PDA seeded by a caller-chosen index,
 /// e.g. seeds `"strategy" + 0`, so strategies are addressed by a simple counter
 /// rather than by the manager's key. The index is stored here so every handler
