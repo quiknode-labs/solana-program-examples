@@ -3,7 +3,7 @@
 > [!NOTE]
 > This is the **Anchor v1** copy of this example, kept for programs staying on the
 > Anchor v1 LTS line. Every `anchor` command on this page needs the v1 CLI:
-> `avm install 1.1.2 && avm use 1.1.2`. The Anchor v2 version of this example is in
+> `avm install 1.2.0 && avm use 1.2.0`. The Anchor v2 version of this example is in
 > [`../anchor`](../anchor/).
 
 A perpetual futures exchange on Solana: a venue for making leveraged bets on an asset's price without ever owning the asset. It is modelled on the oracle-priced, pool-collateralized design used by [Jupiter Perpetuals](https://station.jup.ag/guides/perpetual-exchange/overview) and GMX (and the open-source [`solana-labs/perpetuals`](https://github.com/solana-labs/perpetuals) reference that [Adrena](https://github.com/AdrenaFoundation/adrena-program) and [Flash Trade](https://github.com/flash-trade/flash-perpetuals) fork), rather than the order-book design used by [Drift](https://docs.drift.trade/).

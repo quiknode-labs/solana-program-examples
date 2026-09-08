@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-08
+
+Move to Anchor 1.2.0, LiteSVM 0.16.0 and solana-kite 0.5.0. No program source
+changed. Two tests (`test_stale_price_rejected`,
+`test_funding_charged_to_long`) used to warp to an absolute slot; LiteSVM now
+starts its clock at a mainnet-like slot rather than zero, so those warps moved
+time backwards and the price never went stale and no funding accrued. They now
+warp relative to the current slot, as the other tests already did.
+
 ## 2026-08-14
 
 Add `set_funding_rate`, so the pool authority can retune `funding_rate_per_slot`
