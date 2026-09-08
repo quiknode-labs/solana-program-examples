@@ -199,22 +199,8 @@ jobs:
         with:
           node-version: lts/*
       - name: Install Solana CLI
-        # The installer downloads a release tarball from release.anza.xyz; a
-        # truncated download makes it fail with "failed to iterate over
-        # archive". Retry from scratch a few times before giving up.
         run: |
-          for attempt in 1 2 3 4 5; do
-            rm -rf "$HOME/.local/share/solana/install"
-            if sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.14/install)"; then
-              break
-            fi
-            if [ "$attempt" = 5 ]; then
-              echo "Solana CLI install failed after $attempt attempts"
-              exit 1
-            fi
-            echo "Solana CLI install attempt $attempt failed; retrying in $((attempt * 15))s"
-            sleep $((attempt * 15))
-          done
+          sh -c "$(curl -sSfL https://release.anza.xyz/v3.1.14/install)"
           echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
       - name: Cache Anchor toolchain
         uses: actions/cache@v4
