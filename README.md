@@ -9,7 +9,6 @@ Working, tested, up-to-date examples of common Solana programs (what other chain
 - Every example builds and passes CI on the latest Anchor 2, Anchor 1 and Quasar.
 - Every example uses the current multi-file program layout (one file per instruction handler, account type, etc).
 - Every example uses [LiteSVM](https://github.com/LiteSVM/litesvm) tests rather than the older `solana-test-validator` / web3.js stack.
-- Every Anchor example also keeps its last **Anchor 1.2.0** version in a sibling `anchor-v1/` directory, built and tested by its own CI job, for programs staying on the Anchor v1 LTS line.
 
 [![Anchor v2](../../actions/workflows/anchor.yml/badge.svg)](../../actions/workflows/anchor.yml) [![Anchor v1](../../actions/workflows/anchor-v1.yml/badge.svg)](../../actions/workflows/anchor-v1.yml) [![Quasar](../../actions/workflows/quasar.yml/badge.svg)](../../actions/workflows/quasar.yml) [![Pinocchio](../../actions/workflows/pinocchio.yml/badge.svg)](../../actions/workflows/pinocchio.yml) [![Native](../../actions/workflows/native.yml/badge.svg)](../../actions/workflows/native.yml) [![ASM](../../actions/workflows/solana-asm.yml/badge.svg)](../../actions/workflows/solana-asm.yml)
 
