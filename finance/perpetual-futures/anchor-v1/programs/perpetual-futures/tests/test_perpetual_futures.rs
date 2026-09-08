@@ -791,8 +791,11 @@ fn test_stale_price_rejected() {
     let collateral = 1_000 * ONE_USDC;
     let (trader, trader_collateral) = market.funded_trader(collateral);
 
-    // Move far past the staleness window without refreshing the feed.
-    market.warp(10_000);
+    // Move far past the staleness window without refreshing the feed. Warp
+    // relative to the current slot: LiteSVM starts the clock at a mainnet-like
+    // slot, not at zero, so an absolute target could move time backwards.
+    let opened_at = market.current_slot();
+    market.warp(opened_at + 10_000);
     assert!(market
         .open_position(
             &trader,
@@ -890,8 +893,10 @@ fn test_funding_charged_to_long() {
     let liquidity_before = market.pool_state().liquidity;
 
     // Let funding accrue, then refresh the feed so the price is fresh again and
-    // close at the same price (no profit/loss).
-    market.warp(2_000);
+    // close at the same price (no profit/loss). Warp relative to the current
+    // slot: LiteSVM starts the clock at a mainnet-like slot, not at zero.
+    let opened_at = market.current_slot();
+    market.warp(opened_at + 2_000);
     market.set_price(dollars(100));
     market
         .close_position(&trader, trader_collateral, Side::Long, 0)

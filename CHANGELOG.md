@@ -4,6 +4,50 @@ All notable changes to this repository are documented here.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [2026-09-08] - Anchor v1 examples on Anchor 1.2.0
+
+Anchor 1.2.0 is the current release of the v1 line. Every `anchor-v1/` example now
+builds against it. No program source changed: 1.2.0 has no breaking changes, and
+nothing here calls the two functions it deprecates (`cpi_guard_enable` and
+`cpi_guard_disable`). The test stack had to move, though, because the new
+`anchor-lang` cannot share a dependency graph with the old LiteSVM.
+
+### Changed
+
+- All 56 `anchor-v1/` examples move `anchor-lang` and `anchor-spl` from `1.1.2` to
+  `1.2.0`. Feature lists (`init-if-needed`, `metadata`, `token_2022`, ...) are
+  unchanged.
+- Their tests move from `litesvm 0.13.1` to `litesvm 0.16.0` (Agave 4.2), and the
+  test-only crates that must stay in step with LiteSVM move to their 4.x lines:
+  `solana-transaction 4.1.5`, `solana-message 4.2.4`, `solana-account 4.3.0`. The
+  55 examples that test through `solana-kite` move to `solana-kite 0.5.0`, the
+  release that makes the same LiteSVM bump. The reason: `anchor-lang 1.2.0` requires
+  `solana-loader-v3-interface ^6.1.1`, which requires `solana-instruction ^3.3.0`,
+  while `litesvm 0.13.1` pins `solana-instruction = "=3.2.0"`. Cargo cannot satisfy
+  both, and `solana-kite 0.4.0` pins `litesvm 0.13.1`, so the whole test stack moves
+  together.
+- Three tests warp to a slot relative to the current one instead of an absolute
+  slot: `test_stale_price_rejected` and `test_funding_charged_to_long` in
+  `perpetual-futures`, and `test_swap_rejects_stale_price` in `prop-amm`. LiteSVM
+  0.14 and later start the clock at a mainnet-like slot rather than zero, so a
+  warp to slot 200 or 10,000 moved time backwards and the price under test never
+  went stale. Every other test in the tree already warped relative to the current
+  slot. No other test source changed.
+- The Anchor v1 workflow installs and caches `anchor-cli 1.2.0` instead of `1.1.2`.
+  Everything else about the job is as before: the CLI still comes from crates.io
+  with `--locked`, the Solana CLI is still 3.1.14, and project discovery is
+  unchanged.
+- Every `anchor-v1/` README, `CONTRIBUTING.md` and `docs/anchor-v2-migration.md`
+  name 1.2.0 as the v1 CLI to install.
+
+### Note
+
+- `anchor-cli 1.2.0` builds with `--tools-version v1.57 --arch v3` by default, where
+  1.1.2 passed `--tools-version v1.52` and left the architecture at `cargo
+  build-sbf`'s default. The v1 programs are therefore now SBPF v3 binaries built with
+  platform-tools v1.57. `ANCHOR_BUILD_SBF_ARCH` overrides the architecture if that
+  ever needs to change.
+
 ## [2026-09-04] - Options venue example
 
 ### Added

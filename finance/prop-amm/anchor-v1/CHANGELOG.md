@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-09-08
+
+Move to Anchor 1.2.0, LiteSVM 0.16.0 and solana-kite 0.5.0. No program source
+changed. `test_swap_rejects_stale_price` used to warp to an absolute slot;
+LiteSVM now starts its clock at a mainnet-like slot rather than zero, so that
+warp moved time backwards and the price never went stale. It now warps
+relative to the current slot, as the other tests already did.
+
 ## 2026-08-04
 
 Reject oracle prices from before a cluster restart. A halt stops the slot
