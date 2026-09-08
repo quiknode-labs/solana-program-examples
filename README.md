@@ -6,7 +6,7 @@ _Solana program examples ('smart contracts') in Anchor 2, Anchor 1, Quasar, Pino
 
 Working, tested, up-to-date examples of common Solana programs (what other chains call smart contracts), maintained by [Quicknode](https://www.quicknode.com/chains/solana). Current as of September 2026 (see [CHANGELOG.md](./CHANGELOG.md)):
 
-- Every example builds and passes CI on **Anchor 2.0.0-rc.1**.
+- Every example builds and passes CI on the latest Anchor 2, Anchor 1 and Quasar.
 - Every example uses the current multi-file program layout (one file per instruction handler, account type, etc).
 - Every example uses [LiteSVM](https://github.com/LiteSVM/litesvm) tests rather than the older `solana-test-validator` / web3.js stack.
 - Every Anchor example also keeps its last **Anchor 1.2.0** version in a sibling `anchor-v1/` directory, built and tested by its own CI job, for programs staying on the Anchor v1 LTS line.
